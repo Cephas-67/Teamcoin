@@ -1,6 +1,23 @@
 -- KandoFoncier · schéma Supabase Postgres
 -- À exécuter une fois dans Supabase → SQL Editor
 
+-- ─── Utilisateurs ───────────────────────────────────────────────────────────
+create table if not exists public.users (
+  id          uuid primary key,
+  email       text not null unique,
+  created_at  timestamptz not null default now(),
+  last_seen   timestamptz
+);
+
+create index if not exists idx_users_email on public.users (email);
+
+alter table public.users enable row level security;
+
+-- Lecture/écriture via l'API (service_role), donc pas de policy nécessaire ici.
+-- Si un jour le front lit directement, ajouter une policy "users can read self".
+
+
+-- ─── Actes notariés ──────────────────────────────────────────────────────────
 create table if not exists public.actes (
   id              uuid primary key,
   parcelle_ref    text not null,
@@ -24,6 +41,3 @@ alter table public.actes enable row level security;
 create policy "Lecture publique des actes"
   on public.actes for select
   using (true);
-
--- Les inserts passent par l'API (service_role key), donc pas de policy d'insert nécessaire ici.
--- Si un jour tu veux du write côté client, ajoute une policy 'authenticated insert' adaptée.
