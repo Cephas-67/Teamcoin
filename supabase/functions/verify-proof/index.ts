@@ -30,6 +30,25 @@ import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { sha256OfBytes, verifyProof } from "../_shared/ots.ts";
 
 const OTS_BUCKET = "ots-proofs";
+const AUDIO_BUCKET = "documents-audio";
+
+async function computeCombinedHash(
+  pdfHash: string,
+  audioHash: string | null,
+  sigHash: string | null,
+): Promise<string> {
+  let acc = pdfHash.toLowerCase();
+  const enc = new TextEncoder();
+  for (const h of [audioHash, sigHash]) {
+    if (!h) continue;
+    const bytes = enc.encode(`${acc}::${h.toLowerCase()}`);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    acc = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return acc;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
