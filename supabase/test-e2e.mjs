@@ -48,7 +48,7 @@ const ok = (msg) => console.log(`${c.green}✓${c.reset} ${msg}`);
 const ko = (msg) => console.log(`${c.red}✗${c.reset} ${msg}`);
 const info = (msg) => console.log(`${c.cyan}→${c.reset} ${msg}`);
 const warn = (msg) => console.log(`${c.yellow}⚠${c.reset} ${msg}`);
-const step = (n, msg) => console.log(`\n${c.bold}${c.cyan}[${n}/12]${c.reset} ${c.bold}${msg}${c.reset}`);
+const step = (n, msg) => console.log(`\n${c.bold}${c.cyan}[${n}/17]${c.reset} ${c.bold}${msg}${c.reset}`);
 
 // ─── 1. Chargement de l'env (process.env ou supabase/.env.local) ────────────
 function loadEnv() {
@@ -107,6 +107,25 @@ ${298 + content.length}
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+// Combined hash · doit rester aligné sur computeCombinedHash() des Edge Functions
+// et sur combinedHash() de packages/ledger/hash.ts.
+function computeCombinedHash(pdfHash, audioHash, sigHash) {
+  let acc = pdfHash.toLowerCase();
+  for (const h of [audioHash, sigHash]) {
+    if (!h) continue;
+    acc = createHash("sha256").update(`${acc}::${h.toLowerCase()}`).digest("hex");
+  }
+  return acc;
+}
+
+// Faux fichier audio (bytes random + header WEBM minimal pour la forme)
+function generateFakeAudio() {
+  const bytes = new Uint8Array(2048);
+  bytes[0] = 0x1a; bytes[1] = 0x45; bytes[2] = 0xdf; bytes[3] = 0xa3; // EBML magic
+  for (let i = 4; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return bytes;
 }
 
 async function sleep(ms) {
@@ -308,6 +327,125 @@ async function main() {
       .eq("dossier_id", dossierId)
       .order("changed_at", { ascending: true });
     ok(`Historique automatique · ${history?.length ?? 0} entrée(s) tracée(s) par trigger`);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BUNDLE PDF + AUDIO + SIGNATURE BIOMÉTRIQUE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    step(13, "Création d'un dossier bundle (PDF + audio + signature)");
+    const { data: dossier2, error: d2Err } = await supabase
+      .from("dossiers")
+      .insert({
+        vendeur_nom: "Test Bundle Vendeur",
+        acheteur_nom: "Maman Chantal (Bundle)",
+        acheteur_nationalite: "beninoise",
+        commune: "Abomey-Calavi",
+        quartier: "Cocotomey",
+        zone: "urbaine",
+        parcelle_ref: `BUNDLE-${Date.now()}`,
+      })
+      .select("id")
+      .single();
+    if (d2Err) throw new Error(`insert dossier bundle : ${d2Err.message}`);
+    const bundleDossierId = dossier2.id;
+    ok(`Dossier bundle · ${bundleDossierId}`);
+
+    step(14, "Génération PDF + audio + fausse signature, upload");
+    const bundlePdf = generateTestPdf();
+    const bundleAudio = generateFakeAudio();
+    const fakeSig = sha256(Buffer.from(`fake-pubkey-${Date.now()}`));
+    const pdfHashBundle = sha256(bundlePdf);
+    const audioHashBundle = sha256(bundleAudio);
+    const combinedBundle = computeCombinedHash(pdfHashBundle, audioHashBundle, fakeSig);
+    ok(`PDF hash    · ${pdfHashBundle.slice(0, 16)}...`);
+    ok(`Audio hash  · ${audioHashBundle.slice(0, 16)}...`);
+    ok(`Sig hash    · ${fakeSig.slice(0, 16)}...`);
+    ok(`Combined    · ${combinedBundle.slice(0, 16)}...`);
+
+    const bundlePdfPath = `${bundleDossierId}/bundle.pdf`;
+    const bundleAudioPath = `${bundleDossierId}/bundle/consentement.webm`;
+
+    const { error: pdfUpErr } = await supabase.storage
+      .from("documents-provisoires")
+      .upload(bundlePdfPath, bundlePdf, { contentType: "application/pdf", upsert: true });
+    if (pdfUpErr) throw new Error(`upload PDF bundle : ${pdfUpErr.message}`);
+
+    const { error: audioUpErr } = await supabase.storage
+      .from("documents-audio")
+      .upload(bundleAudioPath, bundleAudio, { contentType: "audio/webm", upsert: true });
+    if (audioUpErr) {
+      throw new Error(
+        `upload audio bundle : ${audioUpErr.message}\n` +
+        `  ↑ Avez-vous créé le bucket "documents-audio" en public read dans Supabase Dashboard ?`,
+      );
+    }
+    ok(`PDF + audio uploadés`);
+
+    const { data: docBundle, error: docBErr } = await supabase
+      .from("documents")
+      .insert({
+        dossier_id: bundleDossierId,
+        type: "attestation_provisoire",
+        storage_bucket: "documents-provisoires",
+        storage_path: bundlePdfPath,
+        sha256: combinedBundle,           // ← le hash ANCRÉ = combined
+        pdf_sha256: pdfHashBundle,
+        audio_storage_path: bundleAudioPath,
+        audio_sha256: audioHashBundle,
+        signataire_pubkey_hash: fakeSig,
+        signataire_credential_id: "fake-credential-id-test",
+        signataire_pubkey_jwk: { kty: "EC", crv: "P-256", x: "fake", y: "fake" },
+        signataire_nom: "Maman Chantal Bundle",
+      })
+      .select("id")
+      .single();
+    if (docBErr) throw new Error(`insert document bundle : ${docBErr.message}`);
+    const bundleDocId = docBundle.id;
+    ok(`Document bundle créé · ${bundleDocId}`);
+
+    step(15, "Ancrage Bitcoin du bundle (PDF + audio + signature)");
+    const { data: anchorBundle, error: aBErr } = await supabase.functions.invoke(
+      "anchor-document",
+      { body: { documentId: bundleDocId } },
+    );
+    if (aBErr) throw new Error(`anchor bundle : ${aBErr.message}`);
+    if (!anchorBundle?.ok) throw new Error(`anchor bundle KO : ${JSON.stringify(anchorBundle)}`);
+    if (anchorBundle.hash !== combinedBundle) {
+      throw new Error(
+        `Combined hash divergent. Attendu ${combinedBundle}, ancré ${anchorBundle.hash}`,
+      );
+    }
+    ok(`Bundle ancré sur Bitcoin · combined=${anchorBundle.hash.slice(0, 16)}...`);
+    ok(`Preuve · ${anchorBundle.proofPath}`);
+
+    step(16, "Vérification crypto du bundle (verify-proof avec audio)");
+    const { data: verifyBundle, error: vBErr } = await supabase.functions.invoke(
+      "verify-proof",
+      { body: { documentId: bundleDocId } },
+    );
+    if (vBErr) throw new Error(`verify bundle : ${vBErr.message}`);
+    if (!verifyBundle?.ok) throw new Error(`verify bundle KO : ${JSON.stringify(verifyBundle)}`);
+    ok(`Verdict bundle · ${verifyBundle.verdict} (hasAudio=${verifyBundle.hasAudio}, hasSignature=${verifyBundle.hasSignature})`);
+
+    step(17, "Falsification du bundle (altération de l'audio)");
+    const audioAltere = generateFakeAudio();  // nouveaux bytes
+    const { error: altErr } = await supabase.storage
+      .from("documents-audio")
+      .upload(bundleAudioPath, audioAltere, { contentType: "audio/webm", upsert: true });
+    if (altErr) throw new Error(`upload audio altéré : ${altErr.message}`);
+    ok(`Audio altéré uploadé à la place de l'original`);
+
+    const { data: verifyAltere } = await supabase.functions.invoke(
+      "verify-proof",
+      { body: { documentId: bundleDocId } },
+    );
+    if (verifyAltere?.verdict !== "mismatch") {
+      throw new Error(
+        `Verdict attendu 'mismatch' après altération audio, reçu '${verifyAltere?.verdict}'`,
+      );
+    }
+    ok(`Falsification audio détectée · verdict=mismatch`);
+    ok(`Reason : ${verifyAltere.reason}`);
 
     // ─── Résumé ─────────────────────────────────────────────────────────────
     console.log(`\n${c.bold}${c.green}━━━ Test end-to-end RÉUSSI ━━━${c.reset}\n`);

@@ -17,6 +17,7 @@ import { LinkButton } from "../components/Button";
 import { HowItWorks } from "../components/sections/HowItWorks";
 import { FAQ } from "../components/sections/FAQ";
 import HeroNav from "@/components/HeroNav";
+import { SectionCard } from "@/components/SectionCard";
 import bg from "../assets/images/bg.svg";
 import img1 from "../assets/images/img1.webp";
 import img2 from "../assets/images/img2.webp";
@@ -74,31 +75,56 @@ function Hero() {
 
         {/* ── Content ──────────────────────────────────────────────────────── */}
 
-        <section
-          className="relative flex flex-col items-center justify-center 
-             w-full min-h-screen  dark:text-white text-black
-             bg-center bg-cover pb-16 pt-8 transition-colors duration-600"
+        <div
+          className="relative flex flex-col items-center justify-center
+             w-full min-h-[88vh] dark:text-white text-black
+             px-4 sm:px-6 pb-12 sm:pb-16 pt-20 sm:pt-8 transition-colors duration-600"
         >
 
-          <h1 className="text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-5">
-            Sécurisez chaque transaction foncière grâce à <span className="text-green-800 dark:text-green-600">Gandéhou</span>
+          <h1 className="text-3xl sm:text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-4 sm:mt-5 leading-tight">
+            Sécurisez chaque transaction foncière grâce à{" "}
+            <span className="text-green-800 dark:text-green-600">Gandéhou</span>
           </h1>
-          <p className="md:text-base line-clamp-3 max-md:px-2 text-center max-w-2xl mt-3">
-            La confiance devient vérifiable.
+          <p className="text-sm sm:text-base text-center max-w-2xl mt-3 px-2">
+            La confiance devient vérifiable. Des documents fonciers sécurisés, traçables et vérifiables grâce aux principes de sécurité de Bitcoin.
+          </p>
 
-            Des documents fonciers sécurisés, traçables et vérifiables grâce aux principes de sécurité de Bitcoin.            </p>
-
-          <div className="grid grid-cols-2 gap-2 mt-8 text-sm">
-            <Link to={"/onboarding"} className="px-8 py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center">Commencer</Link>
-            <a href={"#fonctionnalites"} className="group flex items-center gap-2 dark:bg-white/10 border text-lg border-black/15 dark:border-white/15 rounded-2xl px-6 py-3">
+          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3 mt-6 sm:mt-8 w-full sm:w-auto max-w-sm">
+            <Link
+              to="/onboarding"
+              className="px-6 sm:px-8 py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-base sm:text-lg rounded-2xl flex flex-row items-center justify-center"
+            >
+              Commencer
+            </Link>
+            <a
+              href="#fonctionnalites"
+              className="group flex items-center justify-center gap-2 dark:bg-white/10 border text-base sm:text-lg border-black/15 dark:border-white/15 rounded-2xl px-6 py-3"
+            >
               <span className="font-medium">En savoir plus</span>
-              <svg className="mt-0.5 group-hover:translate-x-2 transition-transform" width="6" height="8" viewBox="0 0 6 8" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden >
-                <path d="M1.25.5 4.75 4l-3.5 3.5" stroke="currentColor" strokeOpacity=".4" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="mt-0.5 group-hover:translate-x-2 transition-transform"
+                width="6"
+                height="8"
+                viewBox="0 0 6 8"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <path
+                  d="M1.25.5 4.75 4l-3.5 3.5"
+                  stroke="currentColor"
+                  strokeOpacity=".4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </a>
           </div>
 
-          <div aria-label="Photos" className="mt-12 flex max-md:overflow-x-auto gap-6 max-w-4xl w-full pb-6 mx-auto">
+          <div
+            aria-label="Photos"
+            className="mt-8 sm:mt-12 flex overflow-x-auto sm:overflow-visible gap-3 sm:gap-6 max-w-4xl w-full pb-4 sm:pb-6 mx-auto px-2 sm:px-0 sm:justify-center snap-x"
+          >
             {heroImages.map((src, i) => (
               <img
                 key={src}
@@ -108,11 +134,11 @@ function Hero() {
                 height={176}
                 loading={i === 0 ? "eager" : "lazy"}
                 decoding="async"
-                className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0"
+                className="w-28 h-36 sm:w-36 sm:h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0 snap-start"
               />
             ))}
           </div>
-        </section>
+        </div>
       </motion.div>
 
     </section>
@@ -179,36 +205,34 @@ function Features() {
   ];
 
   return (
-    <section id="fonctionnalites" className="w-full py-20 lg:py-28">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
-            Tout ce qu'il faut pour sécuriser une transaction foncière.
-          </h2>
-          <p className="mt-4 text-muted md:text-lg">
-            Outils sobres pensés pour le terrain. Aucune fioriture, juste les preuves
-            au bon endroit, vérifiables par n'importe qui.
-          </p>
-        </div>
-
-        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ Icon, title, description }) => (
-            <div
-              key={title}
-              className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-surface dark:bg-black/30 p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface-2 dark:hover:bg-black/40"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-bg/60 text-accent">
-                <Icon className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+    <SectionCard id="fonctionnalites" innerClassName="px-4 sm:px-6 md:px-10 lg:px-14 py-16 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-3xl text-center">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
+          Tout ce qu'il faut pour sécuriser une transaction foncière.
+        </h2>
+        <p className="mt-4 text-muted text-sm sm:text-base md:text-lg">
+          Outils sobres pensés pour le terrain. Aucune fioriture, juste les preuves
+          au bon endroit, vérifiables par n'importe qui.
+        </p>
       </div>
-    </section>
+
+      <div className="mt-10 sm:mt-14 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {features.map(({ Icon, title, description }) => (
+          <div
+            key={title}
+            className="flex flex-col items-start gap-3 sm:gap-4 rounded-2xl border border-border bg-surface dark:bg-black/30 p-5 sm:p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface-2 dark:hover:bg-black/40"
+          >
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-border/60 bg-bg/60 text-accent">
+              <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.8} aria-hidden />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold tracking-tight">{title}</h3>
+              <p className="mt-1.5 sm:mt-2 text-sm leading-relaxed text-muted">{description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -221,66 +245,65 @@ function Stack() {
   ];
 
   return (
-    <section id="stack" className="w-full py-20 lg:py-28">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[36px] border border-border/60 bg-gradient-to-b from-white/60 to-white/30 dark:from-black/40 dark:to-black/60 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_30px_80px_-30px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.07),0_40px_100px_-30px_rgba(0,0,0,0.6)]">
-          {/* Glows ambiants */}
-          <div className="pointer-events-none absolute -top-28 -left-28 h-80 w-80 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-blue)/0.18),transparent_70%)]" />
-          <div className="pointer-events-none absolute -bottom-24 -right-28 h-96 w-96 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-orange)/0.16),transparent_70%)]" />
+    <SectionCard id="stack" innerClassName="px-4 sm:px-6 md:px-10 lg:px-14 py-16 sm:py-20 lg:py-24">
+      <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[24px] sm:rounded-[36px] border border-border bg-surface/60 dark:bg-black/30 backdrop-blur-xl">
+        {/* Glows ambiants charte */}
+        <div className="pointer-events-none absolute -top-20 -left-20 h-60 w-60 sm:h-80 sm:w-80 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(155_100%_18%/0.25),transparent_70%)]" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 sm:h-96 sm:w-96 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(25_92%_54%/0.16),transparent_70%)]" />
 
-          <div className="relative p-10 md:p-14 lg:p-16">
-            <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-text">
-                Une stack pensée pour durer trente ans.
-              </h2>
-              <p className="mt-5 text-base md:text-lg leading-relaxed text-muted">
-                Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
-                Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
-                les preuves restent décodables par n'importe quel outil open-source.
-              </p>
-            </div>
+        <div className="relative p-6 sm:p-10 md:p-14 lg:p-16">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-text">
+              Une stack pensée pour durer trente ans.
+            </h2>
+            <p className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg leading-relaxed text-muted">
+              Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
+              Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
+              les preuves restent décodables par n'importe quel outil open-source.
+            </p>
+          </div>
 
-            <div className="mx-auto mt-14 grid max-w-[640px] grid-cols-2 gap-6 sm:grid-cols-4">
-              {items.map(({ Icon, name, sub }) => (
-                <div
-                  key={name}
-                  className="group/tile relative flex flex-col items-center gap-3 rounded-[24px] border border-border/60 bg-gradient-to-b from-white/80 to-white/40 dark:from-white/[0.04] dark:to-white/[0.02] p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out hover:-translate-y-1"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-bg/60 ring-1 ring-border/60">
-                    <Icon className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-semibold tracking-tight">{name}</div>
-                    <div className="mt-0.5 text-xs text-muted">{sub}</div>
-                  </div>
+          <div className="mx-auto mt-10 sm:mt-14 grid max-w-[640px] grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-4">
+            {items.map(({ Icon, name, sub }) => (
+              <div
+                key={name}
+                className="group/tile relative flex flex-col items-center gap-2 sm:gap-3 rounded-[20px] sm:rounded-[24px] border border-border bg-surface dark:bg-white/[0.04] p-4 sm:p-5 backdrop-blur-md transition-transform duration-300 ease-out hover:-translate-y-1"
+              >
+                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-bg/60 ring-1 ring-border/60">
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-accent" strokeWidth={1.8} aria-hidden />
                 </div>
-              ))}
-            </div>
+                <div className="text-center">
+                  <div className="text-xs sm:text-sm font-semibold tracking-tight">{name}</div>
+                  <div className="mt-0.5 text-[11px] sm:text-xs text-muted">{sub}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
-    </section>
+    </SectionCard>
   );
 }
 
 function FinalCta() {
   return (
-    <section className="py-20 lg:py-28">
-      <div className="container text-center max-w-2xl">
-        <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight">
+    <SectionCard innerClassName="px-4 sm:px-6 py-16 sm:py-20 lg:py-24">
+      <div className="mx-auto text-center max-w-2xl">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 tracking-tight">
           Prêt à sceller votre première vente ?
         </h2>
-        <p className="text-muted text-base mb-7">
+        <p className="text-muted text-sm sm:text-base mb-6 sm:mb-7">
           Trois minutes pour notariser un acte. Une preuve qui survit à votre téléphone, votre serveur
           et notre entreprise.
         </p>
-        <Link to="/citizen-portal"
-          className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
+        <Link
+          to="/citizen-portal"
+          className="px-6 sm:px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-base sm:text-lg rounded-2xl flex flex-row items-center justify-center gap-2"
         >
           Commencer maintenant
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
-    </section>
+    </SectionCard>
   );
 }
