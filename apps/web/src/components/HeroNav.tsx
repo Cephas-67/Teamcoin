@@ -38,10 +38,10 @@ export default function HeroNav() {
           <ThemeToggle />
           <Link
             to="/onboarding"
-            className="px-6 py-2.5 lg:px-8 lg:py-3 bg-black dark:bg-white dark:text-black dark:hover:bg-white/30 dark:hover:text-white hover:bg-green-400 text-white transition-colors duration-500 text-base lg:text-lg rounded-2xl flex flex-row items-center gap-2 lg:gap-3"
+            className="group px-6 py-2.5 lg:px-8 lg:py-3 bg-black dark:bg-white dark:text-black dark:hover:bg-white/30 dark:hover:text-white hover:bg-green-400 text-white transition-colors duration-500 text-base lg:text-lg rounded-2xl flex flex-row items-center gap-2 lg:gap-3"
           >
             Accéder à l'app
-            <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
+            <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5 transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
         </div>
 

@@ -18,6 +18,7 @@ import { HowItWorks } from "../components/sections/HowItWorks";
 import { FAQ } from "../components/sections/FAQ";
 import HeroNav from "@/components/HeroNav";
 import { SectionCard } from "@/components/SectionCard";
+import { Reveal } from "@/components/Reveal";
 import bg from "../assets/images/bg.svg";
 import img1 from "../assets/images/img1.webp";
 import img2 from "../assets/images/img2.webp";
@@ -81,20 +82,21 @@ function Hero() {
              px-4 sm:px-6 pb-12 sm:pb-16 pt-28 sm:pt-32 md:pt-36 transition-colors duration-600"
         >
 
-          <h1 className="text-3xl sm:text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-4 sm:mt-5 leading-tight">
+          <Reveal as="h1" delay={0.1} className="text-3xl sm:text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-4 sm:mt-5 leading-tight">
             Sécurisez chaque transaction foncière grâce à{" "}
             <span className="text-green-800 dark:text-green-600">Gandéhou</span>
-          </h1>
-          <p className="text-sm sm:text-base text-center max-w-2xl mt-3 px-2">
+          </Reveal>
+          <Reveal as="p" delay={0.25} className="text-sm sm:text-base text-center max-w-2xl mt-3 px-2">
             La confiance devient vérifiable. Des documents fonciers sécurisés, traçables et vérifiables grâce aux principes de sécurité de Bitcoin.
-          </p>
+          </Reveal>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-6 sm:mt-8">
+          <Reveal delay={0.4} className="grid grid-cols-2 gap-2 sm:gap-3 mt-6 sm:mt-8">
             <Link
               to="/onboarding"
-              className="px-4 sm:px-8 py-2.5 sm:py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-sm sm:text-lg rounded-2xl flex flex-row items-center justify-center"
+              className="group px-4 sm:px-8 py-2.5 sm:py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-sm sm:text-lg rounded-2xl flex flex-row items-center justify-center gap-2"
             >
               Commencer
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
             <a
               href="#fonctionnalites"
@@ -119,23 +121,24 @@ function Hero() {
                 />
               </svg>
             </a>
-          </div>
+          </Reveal>
 
           <div
             aria-label="Photos"
             className="mt-8 sm:mt-12 flex overflow-x-auto sm:overflow-visible gap-3 sm:gap-6 max-w-4xl w-full pb-4 sm:pb-6 mx-auto px-2 sm:px-0 sm:justify-center snap-x"
           >
             {heroImages.map((src, i) => (
-              <img
-                key={src}
-                alt=""
-                src={src}
-                width={144}
-                height={176}
-                loading={i === 0 ? "eager" : "lazy"}
-                decoding="async"
-                className="w-28 h-36 sm:w-36 sm:h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0 snap-start"
-              />
+              <Reveal key={src} delay={0.6 + i * 0.1}>
+                <img
+                  alt=""
+                  src={src}
+                  width={144}
+                  height={176}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  className="w-28 h-36 sm:w-36 sm:h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0 snap-start"
+                />
+              </Reveal>
             ))}
           </div>
         </div>
@@ -207,29 +210,28 @@ function Features() {
   return (
     <SectionCard id="fonctionnalites" innerClassName="px-4 sm:px-6 md:px-10 lg:px-14 py-16 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
+        <Reveal as="h2" className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
           Tout ce qu'il faut pour sécuriser une transaction foncière.
-        </h2>
-        <p className="mt-4 text-muted text-sm sm:text-base md:text-lg">
+        </Reveal>
+        <Reveal as="p" delay={0.15} className="mt-4 text-muted text-sm sm:text-base md:text-lg">
           Outils sobres pensés pour le terrain. Aucune fioriture, juste les preuves
           au bon endroit, vérifiables par n'importe qui.
-        </p>
+        </Reveal>
       </div>
 
       <div className="mt-10 sm:mt-14 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {features.map(({ Icon, title, description }) => (
-          <div
-            key={title}
-            className="flex flex-col items-start gap-3 sm:gap-4 rounded-2xl border border-border bg-surface dark:bg-black/30 p-5 sm:p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface-2 dark:hover:bg-black/40"
-          >
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-border/60 bg-bg/60 text-accent">
-              <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.8} aria-hidden />
+        {features.map(({ Icon, title, description }, i) => (
+          <Reveal key={title} delay={i * 0.08}>
+            <div className="group flex flex-col items-start gap-3 sm:gap-4 rounded-2xl border border-border bg-surface dark:bg-black/30 p-5 sm:p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-1 hover:border-accent/40 hover:bg-surface-2 dark:hover:bg-black/40 h-full">
+              <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-border/60 bg-bg/60 text-accent transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.8} aria-hidden />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold tracking-tight">{title}</h3>
+                <p className="mt-1.5 sm:mt-2 text-sm leading-relaxed text-muted">{description}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-semibold tracking-tight">{title}</h3>
-              <p className="mt-1.5 sm:mt-2 text-sm leading-relaxed text-muted">{description}</p>
-            </div>
-          </div>
+          </Reveal>
         ))}
       </div>
     </SectionCard>
@@ -253,30 +255,29 @@ function Stack() {
 
         <div className="relative p-6 sm:p-10 md:p-14 lg:p-16">
           <div className="max-w-2xl">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-text">
+            <Reveal as="h2" className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-text">
               Une stack pensée pour durer trente ans.
-            </h2>
-            <p className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg leading-relaxed text-muted">
+            </Reveal>
+            <Reveal as="p" delay={0.15} className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg leading-relaxed text-muted">
               Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
               Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
               les preuves restent décodables par n'importe quel outil open-source.
-            </p>
+            </Reveal>
           </div>
 
           <div className="mx-auto mt-10 sm:mt-14 grid max-w-[640px] grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-4">
-            {items.map(({ Icon, name, sub }) => (
-              <div
-                key={name}
-                className="group/tile relative flex flex-col items-center gap-2 sm:gap-3 rounded-[20px] sm:rounded-[24px] border border-border bg-surface dark:bg-white/[0.04] p-4 sm:p-5 backdrop-blur-md transition-transform duration-300 ease-out hover:-translate-y-1"
-              >
-                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-bg/60 ring-1 ring-border/60">
-                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-accent" strokeWidth={1.8} aria-hidden />
+            {items.map(({ Icon, name, sub }, i) => (
+              <Reveal key={name} delay={0.3 + i * 0.08}>
+                <div className="group/tile relative flex flex-col items-center gap-2 sm:gap-3 rounded-[20px] sm:rounded-[24px] border border-border bg-surface dark:bg-white/[0.04] p-4 sm:p-5 backdrop-blur-md transition-transform duration-300 ease-out hover:-translate-y-1 h-full">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-bg/60 ring-1 ring-border/60 transition-transform duration-300 group-hover/tile:scale-110">
+                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-accent" strokeWidth={1.8} aria-hidden />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs sm:text-sm font-semibold tracking-tight">{name}</div>
+                    <div className="mt-0.5 text-[11px] sm:text-xs text-muted">{sub}</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-xs sm:text-sm font-semibold tracking-tight">{name}</div>
-                  <div className="mt-0.5 text-[11px] sm:text-xs text-muted">{sub}</div>
-                </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -289,20 +290,22 @@ function FinalCta() {
   return (
     <SectionCard innerClassName="px-4 sm:px-6 py-16 sm:py-20 lg:py-24">
       <div className="mx-auto text-center max-w-2xl">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 tracking-tight">
+        <Reveal as="h2" className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 tracking-tight">
           Prêt à sceller votre première vente ?
-        </h2>
-        <p className="text-muted text-sm sm:text-base mb-6 sm:mb-7">
+        </Reveal>
+        <Reveal as="p" delay={0.15} className="text-muted text-sm sm:text-base mb-6 sm:mb-7">
           Trois minutes pour notariser un acte. Une preuve qui survit à votre téléphone, votre serveur
           et notre entreprise.
-        </p>
-        <Link
-          to="/citizen-portal"
-          className="px-6 sm:px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-base sm:text-lg rounded-2xl flex flex-row items-center justify-center gap-2"
-        >
-          Commencer maintenant
-          <ArrowRight className="w-4 h-4" />
-        </Link>
+        </Reveal>
+        <Reveal delay={0.3}>
+          <Link
+            to="/citizen-portal"
+            className="group px-6 sm:px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-base sm:text-lg rounded-2xl flex flex-row items-center justify-center gap-2"
+          >
+            Commencer maintenant
+            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </Link>
+        </Reveal>
       </div>
     </SectionCard>
   );
