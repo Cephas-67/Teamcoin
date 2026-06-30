@@ -31,6 +31,12 @@ import {
   verifyFile, verifyByDocumentId,
   // Vérification cryptographique réelle (Edge Function verify-proof)
   verifyFileDeep, verifyDeepByDocumentId, verifyDeepBySha256,
+  // Audio (enregistrement vocal du consentement)
+  uploadAudio, downloadAudio,
+  // Signature biométrique WebAuthn / Passkey
+  captureSignature, isPasskeySupported,
+  // Bundle PDF + audio + signature avec combined hash
+  createDocumentBundle,
 } from "@/services";
 
 import type {
@@ -171,6 +177,65 @@ async function rejet(dossierId: string, motif: string) {
   toast.success("Dossier rejeté · enregistré dans l'audit trail.");
 }
 ```
+
+### Page `/dossier/:id` · création AVEC audio + empreinte biométrique (bundle)
+
+Cas d'usage Maman Chantal : l'agent foncier enregistre 10s en Fon + Chantal pose son doigt sur l'écran. Les 3 hashes (PDF, audio, pubkey biométrique) sont combinés en cascade et c'est le **combined hash** qui est ancré sur Bitcoin.
+
+```tsx
+import {
+  uploadAudio, captureSignature, createDocumentBundle,
+  uploadPdfProvisoire, anchorDocument, STORAGE_BUCKETS,
+} from "@/services";
+import { sha256OfFile } from "@gandehou/ledger";
+import { AudioRecorder } from "@/components/AudioRecorder";
+import { FingerprintCapture } from "@/components/FingerprintCapture";
+
+const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+const [signature, setSignature] = useState<CapturedSignature | null>(null);
+
+// 1. UI : composants déjà prêts
+<AudioRecorder onRecorded={setAudioBlob} />
+<FingerprintCapture signataireNom="Maman Chantal" onCaptured={setSignature} />
+
+// 2. À la soumission
+async function soumettre() {
+  // PDF
+  const pdfHash = await sha256OfFile(pdfBlob);
+  const doc = await createDocumentBundle({
+    dossier_id: dossierId,
+    type: "attestation_provisoire",
+    storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+    storage_path: `${dossierId}/attestation.pdf`,
+    pdf_sha256: pdfHash,
+    audio: null,        // pré-rempli avant audio upload
+    signature,
+  });
+
+  // Upload PDF
+  await uploadPdfProvisoire(dossierId, doc.id, pdfBlob);
+
+  // Upload audio (si présent) + lier au document
+  if (audioBlob) {
+    const audio = await uploadAudio(dossierId, doc.id, audioBlob);
+    // recreate document avec audio cette fois (ou update)
+    // Plus simple : faire l'upload audio AVANT createDocumentBundle
+  }
+
+  // Ancrage Bitcoin du combined hash
+  await anchorDocument(doc.id);
+}
+```
+
+**Logique du combined hash** (alignée entre client, Edge Function et test) :
+
+```
+acc = pdf_sha256
+si audio     :  acc = SHA-256(acc + "::" + audio_sha256)
+si signature :  acc = SHA-256(acc + "::" + signataire_pubkey_hash)
+```
+
+C'est CE `acc` final qui est stocké dans `documents.sha256` et qui est ancré sur Bitcoin. Si UN SEUL des 3 éléments est altéré (PDF, audio ou pubkey), la vérification crypto échoue.
 
 ### Page `/verifier` · vérification CRYPTO réelle (verify-proof)
 

@@ -30,6 +30,25 @@ import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { sha256OfBytes, verifyProof } from "../_shared/ots.ts";
 
 const OTS_BUCKET = "ots-proofs";
+const AUDIO_BUCKET = "documents-audio";
+
+async function computeCombinedHash(
+  pdfHash: string,
+  audioHash: string | null,
+  sigHash: string | null,
+): Promise<string> {
+  let acc = pdfHash.toLowerCase();
+  const enc = new TextEncoder();
+  for (const h of [audioHash, sigHash]) {
+    if (!h) continue;
+    const bytes = enc.encode(`${acc}::${h.toLowerCase()}`);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    acc = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return acc;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
@@ -52,11 +71,12 @@ Deno.serve(async (req) => {
     const supabase = getAdminClient();
 
     // ─── Récupération du document à vérifier ────────────────────────────────
+    const COLS = "id, dossier_id, storage_bucket, storage_path, sha256, pdf_sha256, audio_storage_path, audio_sha256, signataire_pubkey_hash, ots_proof_path";
     let doc: any;
     if (documentId) {
       const { data, error } = await supabase
         .from("documents")
-        .select("id, dossier_id, storage_bucket, storage_path, sha256, ots_proof_path")
+        .select(COLS)
         .eq("id", documentId)
         .maybeSingle();
       if (error) throw new Error(`Lecture document : ${error.message}`);
@@ -64,7 +84,7 @@ Deno.serve(async (req) => {
     } else {
       const { data, error } = await supabase
         .from("documents")
-        .select("id, dossier_id, storage_bucket, storage_path, sha256, ots_proof_path")
+        .select(COLS)
         .eq("sha256", sha256Input!.toLowerCase())
         .maybeSingle();
       if (error) throw new Error(`Lecture document par hash : ${error.message}`);
@@ -102,28 +122,56 @@ Deno.serve(async (req) => {
 
     // ─── Recalcul SHA-256 du PDF actuel ─────────────────────────────────────
     const pdfBytes = await pdfDl.data.arrayBuffer();
-    const recalculatedHash = await sha256OfBytes(pdfBytes);
+    const pdfHashActuel = await sha256OfBytes(pdfBytes);
+    const pdfHashAttendu = (doc.pdf_sha256 ?? doc.sha256).toLowerCase();
 
-    if (recalculatedHash !== doc.sha256.toLowerCase()) {
-      // Le PDF en Storage a été altéré depuis l'ancrage. C'est le cas le plus
-      // grave : on marque le document en mismatch pour propager le verdict.
-      await supabase
-        .from("documents")
-        .update({ ots_status: "mismatch" })
-        .eq("id", doc.id);
-
+    if (pdfHashActuel !== pdfHashAttendu) {
+      await supabase.from("documents").update({ ots_status: "mismatch" }).eq("id", doc.id);
       return jsonResponse({
         ok: true,
         verdict: "mismatch",
-        reason: "Le PDF en Storage a été altéré depuis l'ancrage. Hash recalculé ne correspond plus.",
-        expectedHash: doc.sha256,
-        actualHash: recalculatedHash,
+        reason: "Le PDF en Storage a été altéré depuis l'ancrage.",
+        expectedPdfHash: pdfHashAttendu,
+        actualPdfHash: pdfHashActuel,
       });
     }
 
+    // ─── Si audio attaché : recalcul + vérification ─────────────────────────
+    let audioHashActuel: string | null = null;
+    if (doc.audio_storage_path) {
+      const { data: audioBlob, error: audioErr } = await supabase.storage
+        .from(AUDIO_BUCKET)
+        .download(doc.audio_storage_path);
+      if (audioErr || !audioBlob) {
+        return jsonResponse({
+          ok: true,
+          verdict: "mismatch",
+          reason: `Audio attendu introuvable (${doc.audio_storage_path}).`,
+        });
+      }
+      audioHashActuel = await sha256OfBytes(await audioBlob.arrayBuffer());
+      if (audioHashActuel !== (doc.audio_sha256 ?? "").toLowerCase()) {
+        await supabase.from("documents").update({ ots_status: "mismatch" }).eq("id", doc.id);
+        return jsonResponse({
+          ok: true,
+          verdict: "mismatch",
+          reason: "L'audio en Storage a été altéré depuis l'ancrage.",
+          expectedAudioHash: doc.audio_sha256,
+          actualAudioHash: audioHashActuel,
+        });
+      }
+    }
+
+    // ─── Recalculer le combined hash (ce qui a été ANCRÉ sur Bitcoin) ───────
+    const combinedActuel = await computeCombinedHash(
+      pdfHashActuel,
+      audioHashActuel,
+      doc.signataire_pubkey_hash ?? null,
+    );
+
     // ─── Vérification crypto réelle contre la preuve OTS ────────────────────
     const otsBytes = new Uint8Array(await otsDl.data.arrayBuffer());
-    const result = await verifyProof(otsBytes, recalculatedHash);
+    const result = await verifyProof(otsBytes, combinedActuel);
 
     // ─── Propagation du verdict en base si mismatch ─────────────────────────
     if (result.verdict === "mismatch") {
@@ -137,7 +185,12 @@ Deno.serve(async (req) => {
       ok: true,
       documentId: doc.id,
       dossierId: doc.dossier_id,
-      hash: recalculatedHash,
+      hash: combinedActuel,
+      pdfHash: pdfHashActuel,
+      audioHash: audioHashActuel,
+      signatureHash: doc.signataire_pubkey_hash ?? null,
+      hasAudio: !!doc.audio_storage_path,
+      hasSignature: !!doc.signataire_pubkey_hash,
       ...result,
     });
   } catch (err) {

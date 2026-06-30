@@ -307,7 +307,7 @@ b.page.drawText("Reference projet :", { x: MARGIN, y: b.y, size: 10, font: fonts
 b.page.drawText("uhfyofjxolhpunpbdefq.supabase.co", { x: MARGIN + 110, y: b.y, size: 10, font: fonts.courier, color: COLORS.ink });
 b.y -= 16;
 b.page.drawText("Date :", { x: MARGIN, y: b.y, size: 10, font: fonts.helvBold, color: COLORS.ink });
-b.page.drawText("Cotonou . 30 juin 2026", { x: MARGIN + 110, y: b.y, size: 10, font: fonts.helv, color: COLORS.ink });
+b.page.drawText("Cotonou . 1er juillet 2026", { x: MARGIN + 110, y: b.y, size: 10, font: fonts.helv, color: COLORS.ink });
 b.y -= 16;
 b.page.drawText("Source de cadrage :", { x: MARGIN, y: b.y, size: 10, font: fonts.helvBold, color: COLORS.ink });
 b.page.drawText("Gandehou_Dossier_Foncier_Bitcoin_Benin_2026.pdf", { x: MARGIN + 110, y: b.y, size: 10, font: fonts.helv, color: COLORS.ink });
@@ -326,25 +326,31 @@ b.p(
 
 b.h2("Ce qui est livre");
 b.bullet([
-  "Schema SQL Postgres avec 5 tables, RLS active, 2 triggers d'audit automatique",
-  "9 services TypeScript typee couvrant tout le cycle de vie d'un dossier foncier",
+  "Schema SQL Postgres : 5 tables + 7 colonnes audio/biometrie + 2 index + 2 triggers d'audit",
+  "11 services TypeScript typees couvrant tout le cycle de vie d'un dossier foncier",
   "Moteur de regles ANDF aligne sur le Code Foncier et Domanial (CFD)",
-  "Wrapper OpenTimestamps isomorphe (Node et Deno) sur la bibliotheque @otskit/client",
-  "3 Edge Functions deployees en production : anchor-document, upgrade-ots, verify-proof",
+  "Wrapper OpenTimestamps isomorphe (Node et Deno) sur @otskit/client (zero-dependance)",
+  "3 Edge Functions deployees : anchor-document, upgrade-ots, verify-proof",
+  "Bundle PDF + audio + signature biometrique : combined hash en cascade ancre sur Bitcoin",
+  "Capture biometrique WebAuthn reelle (Touch ID, Face ID, Windows Hello, Android Bio)",
+  "Enregistrement vocal du consentement (MediaRecorder + bucket dedie + hash + ancrage)",
   "Cron pg_cron de mise a jour automatique des preuves toutes les 30 minutes",
-  "Test end-to-end automatise en 12 etapes, dont scenario de falsification verifie",
+  "4 buckets Storage (provisoires, definitifs, ots-proofs, documents-audio)",
+  "Test end-to-end automatise en 17 etapes, dont 2 scenarios de falsification verifies",
   "Documentation d'integration BACKEND.md pour le developpeur frontend",
 ]);
 
 b.h2("Ce qui n'est PAS livre (et c'est volontaire)");
 b.p(
-  "Conformement au dossier de cadrage (sections 6 et 7.2 : 'Ce que Gandehou ne doit pas pretendre etre'), nous ne prétendons pas remplacer le Notaire ni l'ANDF. Notre couche se positionne en complement de confiance du circuit legal existant, pas en substitut."
+  "Conformement au dossier de cadrage (sections 6 et 7.2 : 'Ce que Gandehou ne doit pas pretendre etre'), nous ne pretendons pas remplacer le Notaire ni l'ANDF. Notre couche se positionne en complement de confiance du circuit legal existant, pas en substitut."
 );
 b.bullet([
   "Auth par OTP SMS reelle : simulee en localStorage (provider tiers type Twilio non integre, conformement au choix hackathon)",
   "Integration directe au numero unique parcellaire et au CEC : documentee comme roadmap post-hackathon (section 7.3 du cadrage)",
   "RLS strictes par role : volontairement permissives (using(true)) pour la demonstration; a durcir en V1 production",
   "Generation PDF cote serveur : conserve cote client via pdf-lib (suffisant pour le hackathon)",
+  "Validation cryptographique de la signature WebAuthn cote serveur : non faite (la public key est stockee, la signature future serait verifiee dans une Edge Function dediee V1.1)",
+  "Transcription speech-to-text de l'audio : roadmap V1.1 (Whisper local ou API cloud)",
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -373,19 +379,29 @@ b.progressBar("Action rejet dossier", 100, "complet");
 b.space(6);
 b.h2("Coeur Bitcoin demontrable");
 b.progressBar("Module OpenTimestamps isomorphe", 100, "complet");
-b.progressBar("Edge Function anchor-document", 100, "deploye + teste");
+b.progressBar("Edge Function anchor-document", 100, "bundle ancre");
 b.progressBar("Edge Function upgrade-ots + cron", 100, "deploye + teste");
-b.progressBar("Edge Function verify-proof", 100, "deploye + teste");
-b.progressBar("Detection de falsification", 100, "validee e2e");
+b.progressBar("Edge Function verify-proof", 100, "bundle verifie");
+b.progressBar("Combined hash en cascade (PDF+audio+sig)", 100, "validee e2e");
+b.progressBar("Detection falsification PDF", 100, "validee e2e");
+b.progressBar("Detection falsification audio", 100, "validee e2e");
+
+b.space(6);
+b.h2("Inclusivite et accessibilite");
+b.progressBar("Enregistrement vocal du consentement", 100, "MediaRecorder + bucket dedie");
+b.progressBar("Signature biometrique WebAuthn reelle", 100, "Touch ID / Face ID / Hello");
+b.progressBar("Service audio (upload + download + hash)", 100, "complet");
+b.progressBar("Service signature (capture Passkey)", 100, "complet");
 
 b.space(6);
 b.h2("Outillage et documentation");
-b.progressBar("Test e2e automatise (12 etapes)", 100, "complet");
+b.progressBar("Test e2e automatise (17 etapes)", 100, "complet");
 b.progressBar("Documentation BACKEND.md", 100, "complet");
 b.progressBar("Documentation deploiement", 100, "complet");
+b.progressBar("PDF de documentation backend", 100, "ce document");
 
 b.space(10);
-b.callout("BILAN GLOBAL", "Backend hackathon : 100% livre. Backend production V1 : ~70% (manque RLS strictes, validation serveur des regles ANDF, upload pieces justificatives, notifications email).", COLORS.green);
+b.callout("BILAN GLOBAL", "Backend hackathon : 100% livre, avec bonus inclusivite (audio + biometrie). Backend production V1 : ~75% (manque RLS strictes, validation serveur des regles ANDF, validation crypto de la signature WebAuthn, transcription audio, upload pieces justificatives, notifications email).", COLORS.green);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 3 - CONFORMITÉ AU DOSSIER DE CADRAGE
@@ -406,6 +422,20 @@ b.table(
     ["Page de verification publique", "OK", "Service verify.ts + verifyFileDeep"],
     ["Verdict visuel 3 etats (vert/jaune/rouge)", "OK", "ots_status: confirmed/pending/mismatch"],
     ["Tableau de bord par role", "OK", "Service listDossiersAvecDernierDocument"],
+  ],
+  [3, 1, 3.5],
+);
+
+b.h2("3.1bis Bonus inclusivite (au-dela du dossier de cadrage)");
+b.p("Le dossier original ne mentionne ni audio ni biometrie. Ces fonctionnalites ont ete ajoutees pour adresser le contexte beninois reel (40% d'illettrisme, faible alphabetisation juridique). Elles renforcent considerablement la valeur du livrable pour le terrain.");
+b.table(
+  ["Fonctionnalite bonus", "Statut", "Livrable"],
+  [
+    ["Enregistrement vocal consentement", "OK", "MediaRecorder + uploadAudio + bucket dedie"],
+    ["Capture biometrique WebAuthn reelle", "OK", "Touch ID/Face ID/Hello via navigator.credentials"],
+    ["Bundle PDF + audio + signature", "OK", "createDocumentBundle + combined hash en cascade"],
+    ["Detection alteration audio post-ancrage", "OK", "Edge Function verify-proof etendue"],
+    ["Validation crypto signature WebAuthn", "Roadmap", "V1.1 (parsing clientDataJSON + ECDSA)"],
   ],
   [3, 1, 3.5],
 );

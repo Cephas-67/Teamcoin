@@ -10,3 +10,5 @@ export * from "./history";
 export * from "./regles-andf";
 export * from "./anchor";
 export * from "./verify";
+export * from "./audio";
+export * from "./signature";

@@ -96,9 +96,24 @@ export type Document = {
   storage_bucket: string;
   storage_path: string;
 
+  // sha256 = hash ANCRÉ sur Bitcoin.
+  // - Si pas d'audio : sha256 == pdf_sha256
+  // - Si audio       : sha256 == combinedHash(pdf_sha256, audio_sha256)
   sha256: string;
+  pdf_sha256: string | null;
   hash_parent: string | null;
 
+  // Audio attaché (optionnel) · enregistrement vocal du consentement
+  audio_storage_path: string | null;
+  audio_sha256: string | null;
+
+  // Signature biométrique WebAuthn / Passkey (optionnel)
+  signataire_pubkey_hash: string | null;
+  signataire_credential_id: string | null;
+  signataire_pubkey_jwk: Record<string, unknown> | null;
+  signataire_nom: string | null;
+
+  // Ancrage Bitcoin
   ots_status: OtsStatus;
   ots_proof_path: string | null;
   ots_block_height: number | null;
@@ -147,6 +162,7 @@ export const STORAGE_BUCKETS = {
   PROVISOIRES: "documents-provisoires",
   DEFINITIFS: "documents-definitifs",
   OTS_PROOFS: "ots-proofs",
+  AUDIO: "documents-audio",
 } as const;
 
 export type StorageBucket = (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS];

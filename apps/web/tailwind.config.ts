@@ -36,8 +36,9 @@ export default {
         },
       },
       fontFamily: {
+        sans: ['"Work Sans"', "system-ui", "sans-serif"],
+        display: ['"Work Sans"', "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
-        sans: ["Work Sans", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       // ── MOVED INTO EXTEND ──────────────────────────────────────
       // Previously at theme root, which REPLACED Tailwind's defaults.

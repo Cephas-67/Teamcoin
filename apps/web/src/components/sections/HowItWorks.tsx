@@ -97,7 +97,7 @@ export function HowItWorks() {
                 <Silk
                   speed={2}
                   scale={1}
-                  color="#7B7481"
+                  color="#3F3FE0"
                   noiseIntensity={0.8}
                   rotation={0}
                   paused={!visible}

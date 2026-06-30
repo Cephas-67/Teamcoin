@@ -109,7 +109,7 @@ function Hero() {
                 />
               </svg>
             </a>
-          </div>
+          </Reveal>
 
           {/* Image strip — scrollable on mobile with proper edge padding */}
           <div
@@ -140,6 +140,7 @@ function Hero() {
               />
             ))}
           </div>
+        </div>
         </div>
       </motion.div>
     </section>
@@ -221,10 +222,10 @@ function Features() {
                 </p>
               </div>
             </div>
-          ))}
-        </div>
+          </Reveal>
+        ))}
       </div>
-    </section>
+    </SectionCard>
   );
 }
 
@@ -271,12 +272,12 @@ function Stack() {
                     <div className="mt-0.5 text-[11px] sm:text-xs text-neutral-900/55 dark:text-white/55">{sub}</div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </Reveal>
+            ))}
           </div>
         </div>
       </div>
-    </section>
+    </SectionCard>
   );
 }
 
@@ -299,6 +300,6 @@ function FinalCta() {
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
-    </section>
+    </SectionCard>
   );
 }
