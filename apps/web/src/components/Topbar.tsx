@@ -3,6 +3,8 @@ import { ArrowRight, Menu } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { LinkButton } from "./Button";
 import { ThemeToggle } from "./ThemeToggle";
+import logo from "../assets/logo.svg";
+
 
 type Props = {
   variant: "public" | "app";
@@ -11,21 +13,33 @@ type Props = {
 
 export function Topbar({ variant, onToggleSidebar }: Props) {
   return (
-    <header className="sticky top-0 z-40 h-16 bg-bg border-b border-border flex items-center px-4 lg:px-6">
-      <Link to="/" className="flex items-center gap-2">
-        <span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent" aria-hidden />
-        <span className="font-black tracking-tighter text-lg">KandoFoncier</span>
-      </Link>
+    <div className="z-40 fixed top-0 left-0 p-6 md:p-10 flex flex-row items-center justify-between w-full">
 
+      <Link to="/" className="flex items-center gap-2">
+        {/* ── Logo ─────────────────────────────────────────────────────────── */}
+        <img src={logo} alt="" className="min-w-[100px] w-[8vw] max-w-[300px]" />
+      </Link>
       {variant === "public" ? <PublicNav /> : <AppNavRight onToggleSidebar={onToggleSidebar} />}
-    </header>
+
+      {/* ── Right cluster ────────────────────────────────────────────────── */}
+      <div className="ml-auto md:ml-3 flex items-center gap-8">
+
+        {/* Dark mode toggle */}
+        <ThemeToggle />
+      </div>
+    </div>
+
   );
 }
 
 function PublicNav() {
   return (
+
     <>
-      <nav className="ml-auto hidden md:flex items-center gap-6 text-sm text-muted">
+
+
+
+      {/* <nav className="ml-auto hidden md:flex items-center gap-6 text-sm text-muted">
         <a href="#fonctionnalites" className="hover:text-text transition-colors">Fonctionnalités</a>
         <a href="#how" className="hover:text-text transition-colors">Comment ça marche</a>
         <a href="#faq" className="hover:text-text transition-colors">FAQ</a>
@@ -39,7 +53,7 @@ function PublicNav() {
           <span>Espace Chef</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </LinkButton>
-      </div>
+      </div> */}
     </>
   );
 }

@@ -24,6 +24,7 @@ export default function App() {
         </Route>
 
         <Route path="/connexion" element={<Connexion />} />
+        <Route path="/onboarding" element={<Onboarding />} />
 
         {/* Vue dossier · stateless · le rôle est dans ?role=chef|vendeur|acheteur.
             Non protégée pour permettre aux vendeur/acheteur sans compte d'y accéder
@@ -32,14 +33,17 @@ export default function App() {
         <Route path="/dossier/:id" element={<DossierPage />} />
 
         {/* Vérificateur public */}
-        <Route element={<PublicAppShell />}>
-          <Route path="/verifier" element={<Verificateur />} />
-        </Route>
+
+        <Route path="/citizen-portal" element={<CitizenPortal />} />
+        <Route path="/verifier" element={<Verificateur />} />
 
         {/* Espace Chef · sidebar + auth requise */}
-        <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+        <Route element={<ProtectedRoute>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dossier/nouveau" element={<NouveauDossier />} />
+          <Route path="/agent-portal" element={<AgentPortal />} />
+          <Route path="/cq-portal" element={<CQPortal />} />
+        </ProtectedRoute>}>
         </Route>
 
         <Route path="*" element={<NotFound />} />
@@ -57,6 +61,10 @@ export default function App() {
 import { Outlet, Link } from "react-router-dom";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ArrowLeft } from "lucide-react";
+import Onboarding from "./pages/Onboarding";
+import CitizenPortal from "./pages/CitizenPortal";
+import AgentPortal from "./pages/AgentPortal";
+import CQPortal from "./pages/CQPortal";
 
 function PublicAppShell() {
   return (

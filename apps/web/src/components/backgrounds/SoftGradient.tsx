@@ -58,7 +58,7 @@ export default function SoftGradient({ children, className }: SoftGradientProps)
     return (
         <div className={`relative w-full ${className ?? ""}`}>
             {/* Orbs en position fixe : suivent le viewport, restent visibles sur toute la page */}
-            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
                 {orbs.map((orb, i) => (
                     <motion.div
                         key={i}
