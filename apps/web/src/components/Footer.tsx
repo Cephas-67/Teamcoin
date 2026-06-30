@@ -72,11 +72,11 @@ function TorchWordmark() {
       ref={ref}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      className="relative w-full overflow-hidden"
+      className="relative w-full overflow-hidden flex flex-col items-center justify-center"
       aria-hidden
     >
       {/* Couche basse · présence constante mais dimmée */}
-      <div className={cn(wordmarkCls, "text-text opacity-[0.08] dark:opacity-[0.12]")}>
+      <div className={cn(wordmarkCls, "text-text opacity-[0.15] dark:opacity-[0.12]")}>
         Gandehou
       </div>
 
@@ -84,7 +84,7 @@ function TorchWordmark() {
       <div
         className={cn(
           wordmarkCls,
-          "absolute inset-0 text-text transition-opacity duration-300",
+          "absolute left-1/2 -translate-x-1/2 text-text transition-opacity duration-300",
           pos.active ? "opacity-100" : "opacity-0",
         )}
         style={{
@@ -111,7 +111,7 @@ export function Footer() {
       >
 
       </div>
-      <div className="container px-4 sm:px-6 lg:px-10 pt-16 sm:pt-20 lg:pt-24 pb-6">
+      <div className="container px-4 sm:px-6 lg:px-10 pt-16 sm:pt-20 lg:pt-24 pb-6 relative z-10">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-4 md:gap-10">
           {/* COL 1 — identité (logo) */}
           <div>

@@ -1,72 +1,92 @@
 import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
-    type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
 } from 'react'
 import { getCurrentChef, logout as authLogout, type Chef } from '@/services/auth'
 import { supabase } from '@/lib/supabase'
 
+// Role values match the profiles.role check constraint (spec p.14).
+export type Role = 'chef_quartier' | 'agent_mairie' | 'admin' | null
+
 type AuthState = {
-    chef: Chef | null
-    loading: boolean
-    /** Re-read the session. Call after a phone-demo login (no Supabase event fires for it). */
-    refresh: () => Promise<void>
-    logout: () => Promise<void>
+  chef: Chef | null
+  role: Role
+  loading: boolean
+  /** Re-read session + role. Call after loginWithPhoneDemo (no Supabase event fires). */
+  refresh: () => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
+async function fetchRole(userId: string): Promise<Role> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+  return (data?.role as Role) ?? null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [chef, setChef] = useState<Chef | null>(null)
-    const [loading, setLoading] = useState(true)
+  const [chef, setChef] = useState<Chef | null>(null)
+  const [role, setRole] = useState<Role>(null)
+  const [loading, setLoading] = useState(true)
 
-    const refresh = useCallback(async () => {
-        setChef(await getCurrentChef())
-    }, [])
+  const load = useCallback(async () => {
+    const c = await getCurrentChef()
+    setChef(c)
+    // Role only exists for real Supabase users (email auth).
+    // Phone-demo sessions have no profiles row yet.
+    if (c?.source === 'email' && c.id) {
+      setRole(await fetchRole(c.id))
+    } else {
+      setRole(null)
+    }
+  }, [])
 
-    useEffect(() => {
-        let active = true
+  const refresh = useCallback(async () => {
+    await load()
+  }, [load])
 
-        // Initial read.
-        getCurrentChef().then((c) => {
-            if (active) {
-                setChef(c)
-                setLoading(false)
-            }
-        })
+  useEffect(() => {
+    let active = true
 
-        // React to email-auth changes: magic-link sign-in, sign-out, token refresh.
-        // NOTE: the phone-demo path lives in localStorage and does NOT emit these
-        // events — the login screen must call refresh() after loginWithPhoneDemo().
-        const { data: sub } = supabase.auth.onAuthStateChange(() => {
-            getCurrentChef().then((c) => {
-                if (active) setChef(c)
-            })
-        })
+    load().then(() => {
+      if (active) setLoading(false)
+    })
 
-        return () => {
-            active = false
-            sub.subscription.unsubscribe()
-        }
-    }, [])
+    // React to email-auth events: magic-link, sign-out, token refresh.
+    // Phone-demo doesn't emit these — call refresh() after loginWithPhoneDemo.
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      if (active) load()
+    })
 
-    const logout = useCallback(async () => {
-        await authLogout()
-        setChef(null)
-    }, [])
+    return () => {
+      active = false
+      sub.subscription.unsubscribe()
+    }
+  }, [load])
 
-    return (
-        <AuthContext.Provider value={{ chef, loading, refresh, logout }}>
-            {children}
-        </AuthContext.Provider>
-    )
+  const logout = useCallback(async () => {
+    await authLogout()
+    setChef(null)
+    setRole(null)
+  }, [])
+
+  return (
+    <AuthContext.Provider value={{ chef, role, loading, refresh, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthState {
-    const ctx = useContext(AuthContext)
-    if (!ctx) throw new Error('useAuth doit être utilisé dans <AuthProvider>.')
-    return ctx
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth doit être utilisé dans <AuthProvider>.')
+  return ctx
 }

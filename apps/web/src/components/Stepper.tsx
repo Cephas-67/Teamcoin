@@ -16,15 +16,12 @@ export function Step({ children }: { children: ReactNode }) {
 
 type StepperProps = {
   children: ReactNode
-  /** 1-based current step, owned by the parent so it can gate advancement. */
   currentStep: number
-  /** Short titles per step, used for accessible labels + the live region. */
   labels?: string[]
   onStepClick?: (step: number) => void
   onBack?: () => void
   onNext?: () => void
   onComplete?: () => void
-  /** Allow jumping to `target`? Defaults to "only steps already visited". */
   canGoToStep?: (target: number) => boolean
   isSubmitting?: boolean
   backLabel?: string
@@ -50,7 +47,6 @@ export default function Stepper({
   const total = steps.length
   const isLast = currentStep === total
 
-  // Direction drives the slide; derived from the previous step value.
   const prev = useRef(currentStep)
   const direction = currentStep >= prev.current ? 1 : -1
   useEffect(() => {
@@ -59,14 +55,12 @@ export default function Stepper({
 
   return (
     <div className="mx-auto w-full max-w-xl">
-      {/* Screen-reader progress announcement. */}
       <p aria-live="polite" className="sr-only">
         Étape {currentStep} sur {total}
         {labels?.[currentStep - 1] ? ` : ${labels[currentStep - 1]}` : ''}
       </p>
 
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm md:p-8 dark:border-white/10 dark:bg-white/[0.03]">
-        {/* Indicator row */}
+      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-8">
         <ol className="mb-8 flex w-full items-center">
           {steps.map((_, i) => {
             const step = i + 1
@@ -84,10 +78,10 @@ export default function Stepper({
                   onClick={() => onStepClick?.(step)}
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold outline-none transition-colors',
-                    'focus-visible:ring-4 focus-visible:ring-green-600/30',
-                    status === 'complete' && 'bg-green-600 text-white',
+                    'focus-visible:ring-4 focus-visible:ring-gandehou-green/30',
+                    status === 'complete' && 'bg-gandehou-green text-white',
                     status === 'active' &&
-                      'bg-green-600/15 text-green-700 ring-2 ring-green-600 dark:text-green-300',
+                      'bg-gandehou-green/15 text-gandehou-green ring-2 ring-gandehou-green',
                     status === 'upcoming' &&
                       'bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/40',
                     reachable && step !== currentStep && 'cursor-pointer',
@@ -99,7 +93,7 @@ export default function Stepper({
                 {i < total - 1 && (
                   <div className="mx-2 h-0.5 flex-1 overflow-hidden rounded bg-black/10 dark:bg-white/10">
                     <motion.div
-                      className="h-full bg-green-600"
+                      className="h-full bg-gandehou-green"
                       initial={false}
                       animate={{ width: step < currentStep ? '100%' : '0%' }}
                       transition={{ duration: 0.4 }}
@@ -111,18 +105,16 @@ export default function Stepper({
           })}
         </ol>
 
-        {/* Sliding content */}
         <StepContent currentStep={currentStep} direction={direction}>
           {steps[currentStep - 1]}
         </StepContent>
 
-        {/* Footer nav */}
         <div className={cn('mt-8 flex items-center', currentStep === 1 ? 'justify-end' : 'justify-between')}>
           {currentStep !== 1 && (
             <button
               type="button"
               onClick={onBack}
-              className="rounded-xl px-4 py-2.5 font-medium text-black/60 outline-none transition-colors hover:text-black focus-visible:ring-4 focus-visible:ring-green-600/30 dark:text-white/60 dark:hover:text-white"
+              className="rounded-xl px-4 py-2.5 font-medium text-black/60 outline-none transition-colors hover:text-black focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:text-white/60 dark:hover:text-white"
             >
               {backLabel}
             </button>
@@ -131,7 +123,7 @@ export default function Stepper({
             type="button"
             onClick={isLast ? onComplete : onNext}
             disabled={isSubmitting}
-            className="rounded-2xl bg-black px-6 py-2.5 font-medium text-white outline-none transition-colors hover:bg-green-500 focus-visible:ring-4 focus-visible:ring-green-600/40 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-green-400 dark:hover:text-white"
+            className="rounded-2xl bg-gandehou-green px-6 py-2.5 font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-60"
           >
             {isLast ? (isSubmitting ? 'Envoi…' : completeLabel) : nextLabel}
           </button>
@@ -141,7 +133,6 @@ export default function Stepper({
   )
 }
 
-/** Measures the active step and animates the container height + slide. */
 function StepContent({
   currentStep,
   direction,
