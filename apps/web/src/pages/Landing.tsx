@@ -78,7 +78,7 @@ function Hero() {
         <div
           className="relative flex flex-col items-center justify-center
              w-full min-h-[88vh] dark:text-white text-black
-             px-4 sm:px-6 pb-12 sm:pb-16 pt-20 sm:pt-8 transition-colors duration-600"
+             px-4 sm:px-6 pb-12 sm:pb-16 pt-28 sm:pt-32 md:pt-36 transition-colors duration-600"
         >
 
           <h1 className="text-3xl sm:text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-4 sm:mt-5 leading-tight">
@@ -89,16 +89,16 @@ function Hero() {
             La confiance devient vérifiable. Des documents fonciers sécurisés, traçables et vérifiables grâce aux principes de sécurité de Bitcoin.
           </p>
 
-          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3 mt-6 sm:mt-8 w-full sm:w-auto max-w-sm">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-6 sm:mt-8">
             <Link
               to="/onboarding"
-              className="px-6 sm:px-8 py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-base sm:text-lg rounded-2xl flex flex-row items-center justify-center"
+              className="px-4 sm:px-8 py-2.5 sm:py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-sm sm:text-lg rounded-2xl flex flex-row items-center justify-center"
             >
               Commencer
             </Link>
             <a
               href="#fonctionnalites"
-              className="group flex items-center justify-center gap-2 dark:bg-white/10 border text-base sm:text-lg border-black/15 dark:border-white/15 rounded-2xl px-6 py-3"
+              className="group flex items-center justify-center gap-2 dark:bg-white/10 border text-sm sm:text-lg border-black/15 dark:border-white/15 rounded-2xl px-4 sm:px-6 py-2.5 sm:py-3"
             >
               <span className="font-medium">En savoir plus</span>
               <svg
