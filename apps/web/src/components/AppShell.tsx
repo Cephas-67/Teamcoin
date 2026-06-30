@@ -24,7 +24,7 @@ export function AppShell() {
 export function PublicShell() {
   return (
     <div className="min-h-screen flex flex-col bg-bg">
-      <Topbar variant="public" />
+      {/* <Topbar variant="public" /> */}
       <main className="flex-1">
         <Outlet />
       </main>

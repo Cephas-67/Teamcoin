@@ -17,6 +17,10 @@ import { LinkButton } from "../components/Button";
 import { BentoItem } from "../components/BentoItem";
 import { HowItWorks } from "../components/sections/HowItWorks";
 import { FAQ } from "../components/sections/FAQ";
+import SoftGradient from "@/components/backgrounds/SoftGradient";
+import HeroNav from "@/components/HeroNav";
+import btc from "../assets/BTCIcon.png"
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Landing() {
   return (
@@ -33,40 +37,181 @@ export default function Landing() {
 
 function Hero() {
   return (
-    <section className="relative pt-20 lg:pt-28 pb-16 lg:pb-20 overflow-hidden">
-      <div className="grid-bg" />
-      <div className="container relative">
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tighter max-w-5xl">
-          La parole et l'empreinte.<br />
-          <span className="hl-accent">Scellées</span> dans Bitcoin.
-        </h1>
+    <div className="w-full h-screen flex flex-col items-center justify-center">
+      <SoftGradient className="w-[98vw] min-h-[98vh] rounded-[36px]">
+        <section
+          className="relative flex flex-col items-center justify-center
+                  pt-20 lg:pt-28 pb-16 lg:pb-20 overflow-hidden w-full h-[98vh]
+                  transition-colors duration-500 dark:text-white text-black"
+        >
+          {/* ── Top nav ──────────────────────────────────────────────────────── */}
+          <HeroNav />
 
-        <p className="mt-6 text-base md:text-lg text-muted max-w-2xl leading-relaxed">
-          KandoFoncier élimine les doubles ventes et les actes falsifiés.
-          Audio dans la langue locale, biométrie sur smartphone, ancrage cryptographique
-          éternel via OpenTimestamps. Pensé pour les 40 % de Béninois qui ne lisent pas.
+          {/* ── Content ──────────────────────────────────────────────────────── */}
+          {/* <div className="container flex flex-row items-start justify-center relative">
+            <div className="w-[60%]">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-semibold leading-[1.05] tracking-tighter max-w-5xl">
+                La parole et l'empreinte.<br />
+                <span className="hl-accent">Scellées</span> dans Bitcoin.
+              </h1>
+
+              <p
+                className="mt-6 text-base md:text-lg max-w-2xl leading-relaxed transition-colors duration-500 dark:text-white/60 text-black/60"
+              >
+                KandoFoncier élimine les doubles ventes et les actes falsifiés.
+                Audio dans la langue locale, biométrie sur smartphone, ancrage cryptographique
+                éternel via OpenTimestamps. Pensé pour les 40 % de Béninois qui ne lisent pas.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <LinkButton to="/notariser" variant="primary" size="lg">
+                  Notariser un acte
+                  <ArrowRight className="w-4 h-4" />
+                </LinkButton>
+                <LinkButton to="/explorer" variant="outline" size="lg">
+                  <Play className="w-4 h-4" />
+                  Explorer le ledger
+                </LinkButton>
+              </div>
+
+              <div
+                className="mt-14 pt-8 border-t grid grid-cols-2 md:grid-cols-4 gap-6 transition-colors duration-500 dark:border-white/15 border-border"
+              >
+                <Stat label="Coût d'ancrage" value="0" suffix=" FCFA" />
+                <Stat label="Langues locales" value="4" suffix="+" hint="Fon · Yoruba · Adja…" />
+                <Stat label="Vérification" value="<2s" hint="hash recomputé local" />
+                <Stat label="Durée de preuve" value="∞" hint="tant que Bitcoin vit" />
+              </div>
+            </div>
+
+            <div className="w-[40%] h-full">
+              <img src={btc} alt="Bitcoin" />
+            </div>
+          </div> */}
+
+          {/* <section className=" w-full bg-no-repeat bg-cover bg-center text-sm pb-44">
+
+            <div className="flex items-center gap-2 border border-slate-300 hover:border-slate-400/70 rounded-full w-max mx-auto px-4 py-2 mt-40 md:mt-32">
+              <span>New announcement on your inbox</span>
+              <button className="flex items-center gap-1 font-medium">
+                <span>Read more</span>
+                <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <path d="M3.959 9.5h11.083m0 0L9.501 3.958M15.042 9.5l-5.541 5.54" stroke="#050040" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <h5 className="text-4xl md:text-7xl font-medium max-w-[850px] text-center mx-auto mt-8">
+              Build apps faster with ui components
+            </h5>
+
+            <p className="text-sm md:text-base mx-auto max-w-2xl text-center mt-6 max-md:px-2">
+              Build sleek, consistent UIs without wrestling with design systems, our components handle the heavy lifting so you can ship faster.
+            </p>
+
+            <div className="mx-auto w-full flex items-center justify-center gap-3 mt-4">
+              <button className="bg-slate-800 hover:bg-black text-white px-6 py-3 rounded-full font-medium transition">
+                Get Started
+              </button>
+              <button className="flex items-center gap-2 border border-slate-300 hover:bg-slate-200/30 rounded-full px-6 py-3">
+                <span>Learn More</span>
+                <svg width="6" height="8" viewBox="0 0 6 8" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <path d="M1.25.5 4.75 4l-3.5 3.5" stroke="#050040" strokeOpacity=".4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </section> */}
+
+          {/* bg-[url('https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/hero/bg-gradient-3.svg')]  */}
+          <section
+            className="relative flex flex-col items-center justify-center 
+             w-full min-h-screen  dark:text-white text-black
+             bg-center bg-cover pb-16 pt-8 transition-colors duration-600"
+          >
+
+            <div className="flex items-center gap-2 border border-white/15 rounded-full px-4 py-2 text-sm mt-24 mx-auto">
+              <p>Explore how we help grow brands.</p>
+              <a href="#" className="flex items-center gap-1 font-medium">
+                Read more
+                <svg className="mt-0.5" width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <path d="M3.959 9.5h11.083m0 0L9.501 3.96m5.541 5.54-5.541 5.542" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+
+            <h1 className="text-4xl md:text-6xl text-center font-semibold max-w-3xl mt-5">
+              Solutions to Elevate Your Business Growth
+            </h1>
+            <p className="md:text-base line-clamp-3 max-md:px-2 text-center max-w-2xl mt-3">
+              Unlock potential with tailored strategies designed for success. Simplify challenges, maximize results, and stay ahead in the competitive market.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mt-8 text-sm">
+              <button className="px-8 py-3 bg-black dark:bg-green-500 dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-full">Get Started</button>
+              <button className="flex items-center gap-2 dark:bg-white/10 border text-lg border-black/15 dark:border-white/15 rounded-full px-6 py-3">
+                <span>Learn More</span>
+                <svg className="mt-0.5" width="6" height="8" viewBox="0 0 6 8" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <path d="M1.25.5 4.75 4l-3.5 3.5" stroke="currentColor" strokeOpacity=".4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div aria-label="Photos of leaders" className="mt-12 flex max-md:overflow-x-auto gap-6 max-w-4xl w-full pb-6 mx-auto">
+              <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/flagged/photo-1573740144655-bbb6e88fb18a?q=80&w=735&auto=format&fit=crop" width={120} />
+              <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=687&auto=format&fit=crop" width={120} />
+              <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=687&auto=format&fit=crop" width={120} />
+              <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1546961329-78bef0414d7c?q=80&w=687&auto=format&fit=crop" width={120} />
+              <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1639149888905-fb39731f2e6c?q=80&w=764&auto=format&fit=crop" width={120} />
+            </div>
+          </section>
+
+        </section>
+      </SoftGradient>
+    </div>
+  );
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+        * { font-family: 'Poppins', sans-serif; }
+      `}</style>
+
+      <section className="bg-[url('https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/hero/gridBackground.png')] w-full bg-no-repeat bg-cover bg-center text-sm pb-44">
+
+        <div className="flex items-center gap-2 border border-slate-300 hover:border-slate-400/70 rounded-full w-max mx-auto px-4 py-2 mt-40 md:mt-32">
+          <span>New announcement on your inbox</span>
+          <button className="flex items-center gap-1 font-medium">
+            <span>Read more</span>
+            <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <path d="M3.959 9.5h11.083m0 0L9.501 3.958M15.042 9.5l-5.541 5.54" stroke="#050040" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        <h5 className="text-4xl md:text-7xl font-medium max-w-[850px] text-center mx-auto mt-8">
+          Build apps faster with ui components
+        </h5>
+
+        <p className="text-sm md:text-base mx-auto max-w-2xl text-center mt-6 max-md:px-2">
+          Build sleek, consistent UIs without wrestling with design systems, our components handle the heavy lifting so you can ship faster.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <LinkButton to="/notariser" variant="primary" size="lg">
-            Notariser un acte
-            <ArrowRight className="w-4 h-4" />
-          </LinkButton>
-          <LinkButton to="/explorer" variant="outline" size="lg">
-            <Play className="w-4 h-4" />
-            Explorer le ledger
-          </LinkButton>
+        <div className="mx-auto w-full flex items-center justify-center gap-3 mt-4">
+          <button className="bg-slate-800 hover:bg-black text-white px-6 py-3 rounded-full font-medium transition">
+            Get Started
+          </button>
+          <button className="flex items-center gap-2 border border-slate-300 hover:bg-slate-200/30 rounded-full px-6 py-3">
+            <span>Learn More</span>
+            <svg width="6" height="8" viewBox="0 0 6 8" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <path d="M1.25.5 4.75 4l-3.5 3.5" stroke="#050040" strokeOpacity=".4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
-
-        <div className="mt-14 pt-8 border-t border-border grid grid-cols-2 md:grid-cols-4 gap-6">
-          <Stat label="Coût d'ancrage" value="0" suffix=" FCFA" />
-          <Stat label="Langues locales" value="4" suffix="+" hint="Fon · Yoruba · Adja…" />
-          <Stat label="Vérification" value="<2s" hint="hash recomputé local" />
-          <Stat label="Durée de preuve" value="∞" hint="tant que Bitcoin vit" />
-        </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
+
 }
 
 function Stat({ label, value, suffix, hint }: { label: string; value: string; suffix?: string; hint?: string }) {
