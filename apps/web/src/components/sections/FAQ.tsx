@@ -10,7 +10,7 @@ export function FAQ() {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="relative bg-bg py-20 sm:py-28 lg:py-36">
+    <section id="faq" className="relative py-20 sm:py-28 lg:py-36">
       <div className="container">
         <div className="grid gap-10 md:grid-cols-2 md:gap-16">
           <div className="md:sticky md:top-24 md:self-start">

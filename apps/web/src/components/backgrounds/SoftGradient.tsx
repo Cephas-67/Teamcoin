@@ -1,7 +1,5 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
-import { useScroll, useTransform } from "motion/react";
-import { useRef } from "react";
 
 interface SoftGradientProps {
     children: ReactNode;
@@ -57,29 +55,17 @@ const orbs = [
 ];
 
 export default function SoftGradient({ children, className }: SoftGradientProps) {
-    const ref = useRef(null);
-    const { scrollYProgress } = useScroll();
-    const width = useTransform(scrollYProgress, [0, 0.1], ["98vw", "90vw"]);
-
     return (
-        <motion.div
-            ref={ref}
-            style={{ width }}
-            className={`relative w-full h-full overflow-hidden ${className ?? ""}`}
-        >
-            <div
-                className="hidden dark:block absolute inset-0 z-10 backdrop-blur-[120px]"
-            />
-
-            {/* ── Orbs ─────────────────────────────────────────────────────────── */}
-            <div className="absolute inset-0 z-[1] pointer-events-none">
+        <div className={`relative w-full ${className ?? ""}`}>
+            {/* Orbs en position fixe : suivent le viewport, restent visibles sur toute la page */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
                 {orbs.map((orb, i) => (
                     <motion.div
                         key={i}
                         className="absolute rounded-full"
                         style={{
                             width: orb.size,
-                            height: orb.size * 1.4,          // tall ellipse like the reference
+                            height: orb.size * 1.4,
                             top: orb.initial.top,
                             left: orb.initial.left,
                             opacity: orb.opacity,
@@ -96,10 +82,13 @@ export default function SoftGradient({ children, className }: SoftGradientProps)
                 ))}
             </div>
 
-            {/* ── Children ─────────────────────────────────────────────────────── */}
-            <div className="relative z-30">
+            {/* Voile flou en mode sombre, au-dessus des orbs */}
+            <div className="hidden dark:block fixed inset-0 z-[1] backdrop-blur-[120px] pointer-events-none" />
+
+            {/* Contenu, au-dessus du background */}
+            <div className="relative z-10">
                 {children}
             </div>
-        </motion.div>
+        </div>
     );
 }

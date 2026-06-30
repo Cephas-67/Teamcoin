@@ -4,7 +4,8 @@ import {
   ArrowLeft, ArrowRight, Mail, ShieldCheck, CheckCircle2, Loader2, Phone, MessageSquare,
 } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { sendEmailOtp, verifyEmailOtp, signInWithPhoneDemo } from "../services/auth";
+import { BackButton } from "../components/BackButton";
+import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo } from "../services/auth";
 import { PhoneInput } from "../components/PhoneInput";
 import { countries, formatPhone } from "../data/countries";
 
@@ -88,25 +89,17 @@ export default function Connexion() {
     setCountdown(60);
   };
 
-  const handleVerifyPhone = useCallback(async () => {
+  const handleVerifyPhone = useCallback(() => {
     if (otp.length < 6) return;
     if (otp !== PHONE_DEMO_OTP) {
-      setError(`Code incorrect. Démo : ${PHONE_DEMO_OTP}`);
+      setError("Code incorrect.");
       setOtp("");
       return;
     }
-    setLoading(true);
     setError("");
-    try {
-      await signInWithPhoneDemo(phone);
-      setStep("success");
-      setTimeout(() => navigate(redirectTo, { replace: true }), 1100);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Connexion impossible.");
-      setOtp("");
-    } finally {
-      setLoading(false);
-    }
+    loginWithPhoneDemo(phone);
+    setStep("success");
+    setTimeout(() => navigate(redirectTo, { replace: true }), 1100);
   }, [phone, otp, navigate, redirectTo]);
 
   useEffect(() => {
@@ -127,10 +120,7 @@ export default function Connexion() {
     <div className="min-h-screen bg-bg">
       <div className="flex items-center justify-between px-5 py-5">
         {step === "input" ? (
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted hover:text-text transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Retour
-          </Link>
+          <BackButton fallback="/" />
         ) : step === "otp" ? (
           <button type="button" onClick={() => { setStep("input"); setOtp(""); setError(""); }}
             className="inline-flex items-center gap-2 text-sm text-muted hover:text-text transition-colors">
@@ -233,12 +223,6 @@ export default function Connexion() {
               <Icon icon={ShieldCheck} />
               <Title>Vérification SMS</Title>
               <Lead>Code envoyé au <span className="font-semibold text-text font-mono">{formatE164(phone)}</span></Lead>
-
-              <div className="mb-5 p-3 rounded-md border border-warn/30 bg-warn/10 text-xs text-warn/90 leading-relaxed text-center">
-                💡 <strong>Mode démo</strong> · le code est{" "}
-                <span className="font-mono font-bold text-warn">{PHONE_DEMO_OTP}</span>
-                <br /><span className="text-warn/70">En prod : SMS via Twilio / Africa's Talking.</span>
-              </div>
 
               {error && <ErrorBox>{error}</ErrorBox>}
 
