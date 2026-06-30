@@ -25,6 +25,8 @@ export default function App() {
 
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/dossier-formulaire" element={<DossierForm />} />
+        <Route path="/verification" element={<VerificationPortal />} />
 
         {/* Vue dossier · stateless · le rôle est dans ?role=chef|vendeur|acheteur.
             Non protégée pour permettre aux vendeur/acheteur sans compte d'y accéder
@@ -65,6 +67,8 @@ import Onboarding from "./pages/Onboarding";
 import CitizenPortal from "./pages/CitizenPortal";
 import AgentPortal from "./pages/AgentPortal";
 import CQPortal from "./pages/CQPortal";
+import DossierForm from "./pages/features/dossier/DossierForm";
+import VerificationPortal from "./pages/features/verification/VerificationPortal";
 
 function PublicAppShell() {
   return (

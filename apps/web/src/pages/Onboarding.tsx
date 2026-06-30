@@ -3,6 +3,9 @@ import { motion, useReducedMotion } from 'framer-motion'
 import type { Variants } from 'framer-motion'
 import logo from "../assets/logo.svg";
 import bg from "../assets/images/bg.svg"
+import { ArrowLeft } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { PortalNav } from '@/components/PortalNav';
 
 
 
@@ -61,22 +64,11 @@ export default function Onboarding() {
     const cardMotion = reduceMotion ? {} : { variants: card }
 
     return (
-        <main className="min-h-screen w-full bg-white p-2 lg:p-4 pt-5 lg:pt-10">
-            <header className='p-3 lg:p-10'>
-                <Link to={"/"}>
-                    <img src={logo} alt="" className="min-w-[100px] w-[8vw] max-w-[300px]" />
-                </Link>
-            </header>
+        <main className="min-h-screen w-full bg-white dark:bg-black p-2 lg:p-4">
+            <PortalNav />
 
-            {/* <div
-                style={{ backgroundImage: `url('${bg}')` }}
-                className="bg-cover lg:bg-contain bg-bottom w-full h-full opacity-10 dark:opacity-20 fixed top-1/3 lg:top-1/2 left-0"
-            >
-
-            </div> */}
-
-            <h1 className="text-4xl font-semibold w-full text-center text-black p-8 xl:text-6xl">Choisissez votre espace</h1>
-            <p className='text-lg font-normal w-full text-center text-black/30 pb-8 xl:text-xl'>Votre espace vous permet de faire vos transactions en toute simplicité</p>
+            <h1 className="text-4xl font-semibold w-full text-center text-black dark:text-white p-8 xl:text-6xl">Choisissez votre espace</h1>
+            <p className='text-lg font-normal w-full text-center text-black/60 dark:text-white/60 pb-8 xl:text-xl'>Votre espace vous permet de faire vos transactions en toute simplicité</p>
 
             <motion.ul
                 {...listMotion}
@@ -97,13 +89,11 @@ export default function Onboarding() {
                             state={role.authRole ? { role: role.authRole } : undefined}
                             className="
                 flex w-full flex-1 items-center justify-center rounded-3xl
-                bg-green-50 p-6 text-center no-underline outline-none border
-                transition-all hover:bg-green-200 hover:translate-y-1
-                focus-visible:ring-4 focus-visible:ring-green-600 focus-visible:ring-offset-2
+                border border-black/10 bg-green-50 p-7 no-underline outline-none transition-all hover:-translate-y-1 hover:bg-green-100 focus-visible:ring-4 focus-visible:ring-green-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:p-9 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] dark:focus-visible:ring-offset-neutral-950
                 md:aspect-square md:flex-none
               "
                         >
-                            <span className="text-2xl font-semibold text-green-950 md:text-3xl">
+                            <span className="text-2xl font-semibold text-green-950 dark:text-green-50 md:text-3xl">
                                 {role.label}
                             </span>
                         </Link>

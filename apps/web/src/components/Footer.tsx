@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Github, Twitter, Linkedin, Mail } from "lucide-react";
 import { cn } from "../lib/cn";
+import bg from "../assets/images/bg.svg"
+import logo from "../assets/logo.svg"; // TODO(path): adjust if Footer.tsx isn't one level under assets/
 
 type FooterCol = { heading: string; links: { label: string; href: string }[] };
 
@@ -41,12 +43,13 @@ const SOCIALS = [
   { label: "GitHub", href: "#", icon: Github },
   { label: "Twitter", href: "#", icon: Twitter },
   { label: "LinkedIn", href: "#", icon: Linkedin },
-  { label: "Email", href: "mailto:contact@kandofoncier.bj", icon: Mail },
+  { label: "Email", href: "mailto:contact@gandehou.bj", icon: Mail },
 ];
 
-// Wordmark géant KandoFoncier avec effet "torche".
+// Wordmark géant Gandehou avec effet "torche".
 // Deux couches superposées : la basse en opacité réduite, la haute pleine
 // densité révélée par un radial-gradient qui suit le curseur.
+// aria-hidden : purement décoratif — la marque accessible est le logo (col 1).
 function TorchWordmark() {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: -9999, y: -9999, active: false });
@@ -74,7 +77,7 @@ function TorchWordmark() {
     >
       {/* Couche basse · présence constante mais dimmée */}
       <div className={cn(wordmarkCls, "text-text opacity-[0.08] dark:opacity-[0.12]")}>
-        Kando<span className="text-accent">Foncier</span>
+        Gandehou
       </div>
 
       {/* Couche haute · révélée par la torche */}
@@ -91,7 +94,7 @@ function TorchWordmark() {
           maskRepeat: "no-repeat",
         }}
       >
-        Kando<span className="text-accent">Foncier</span>
+        Gandehou
       </div>
     </div>
   );
@@ -100,14 +103,20 @@ function TorchWordmark() {
 export function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="relative w-full overflow-hidden bg-bg text-text/80">
+    <footer className="relative w-full overflow-hidden bg-bg text-text/80"
+    >
+      <div
+        style={{ backgroundImage: `url('${bg}')` }}
+        className="bg-cover bg-bottom w-full h-full opacity-10 dark:opacity-20 absolute top-0 left-0"
+      >
+
+      </div>
       <div className="container px-4 sm:px-6 lg:px-10 pt-16 sm:pt-20 lg:pt-24 pb-6">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-4 md:gap-10">
-          {/* COL 1 — identité */}
+          {/* COL 1 — identité (logo) */}
           <div>
-            <Link to="/" className="inline-flex items-center gap-2">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent" />
-              <span className="font-black tracking-tighter text-lg text-text">KandoFoncier</span>
+            <Link to="/" aria-label="Gandehou — Accueil" className="inline-flex items-center">
+              <img src={logo} alt="Gandehou" className="h-9 w-auto" />
             </Link>
             <p className="mt-6 text-sm text-text/65">
               Notarisation foncière inclusive ancrée sur Bitcoin.
@@ -115,10 +124,10 @@ export function Footer() {
               Cotonou · Bénin
             </p>
             <a
-              href="mailto:contact@kandofoncier.bj"
+              href="mailto:contact@gandehou.bj"
               className="mt-2 block text-sm text-text/75 transition-colors hover:text-text"
             >
-              contact@kandofoncier.bj
+              contact@gandehou.bj
             </a>
           </div>
 
@@ -145,7 +154,7 @@ export function Footer() {
         {/* Barre legal */}
         <div className="mt-16 flex flex-col gap-6 border-t border-text/10 pt-6 text-[13px] text-text/55 sm:mt-20 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <span>© {year} KandoFoncier</span>
+            <span>© {year} Gandehou</span>
             {LEGAL.map((l) => (
               <a
                 key={l.label}

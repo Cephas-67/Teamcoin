@@ -1,44 +1,101 @@
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
-import React from 'react'
-import { Link } from 'react-router-dom';
-import logo from "../assets/logo.svg";
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { ArrowLeft, ArrowRight, FilePlus2, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
+import type { Variants } from 'framer-motion'
+import { PortalNav } from '@/components/PortalNav'
 
+<PortalNav />
 
-function PortalNav() {
-    return (
-        <div className="p-6 md:p-10 flex flex-row items-center justify-between w-full">
-
-            {/* ── Logo ─────────────────────────────────────────────────────────── */}
-            <Link to={"/"}>
-                <img src={logo} alt="" className="min-w-[100px] w-[8vw] max-w-[300px]" />
-            </Link>
-
-            {/* ── Right cluster ────────────────────────────────────────────────── */}
-            <div className="ml-auto md:ml-3 flex items-center gap-8">
-                <Link
-                    to={"/"}
-                    className="px-5 py-3 bg-black dark:bg-white dark:text-black dark:hover:bg-white/30 dark:hover:text-white hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center gap-3"                >
-
-
-                    <ArrowLeft />
-                    Retour
-                </Link>
-
-                {/* Dark mode toggle */}
-                <ThemeToggle />
-            </div>
-        </div>
-    );
+type Journey = {
+    id: string
+    to: string
+    title: string
+    description: string
+    cta: string
+    icon: typeof FilePlus2
 }
 
+// Routes reused from your Footer so the app stays consistent.
+const JOURNEYS: Journey[] = [
+    {
+        id: 'dossier',
+        to: '/dossier-formulaire',
+        title: 'Initier un dossier',
+        description:
+            "Préparez votre dossier de transaction foncière depuis votre téléphone, étape par étape. Aucun compte requis.",
+        cta: 'Commencer le dossier',
+        icon: FilePlus2,
+    },
+    {
+        id: 'verifier',
+        to: '/verification',
+        title: 'Vérifier un document',
+        description:
+            "Banque ou notaire ? Glissez une convention pour contrôler instantanément son authenticité et son statut.",
+        cta: 'Vérifier un document',
+        icon: ShieldCheck,
+    },
+]
+
+const list: Variants = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+}
+
+const card: Variants = {
+    hidden: { opacity: 0, y: 24 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
+}
 
 export default function CitizenPortal() {
+    const reduceMotion = useReducedMotion()
+    const listMotion = reduceMotion
+        ? {}
+        : { variants: list, initial: 'hidden' as const, animate: 'show' as const }
+    const cardMotion = reduceMotion ? {} : { variants: card }
 
     return (
-        <div>
+        <div className="min-h-screen w-full bg-white text-black dark:bg-neutral-950 dark:text-white">
             <PortalNav />
-            CitizenPortal vgbjnmp
+
+            <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-6 md:pt-10">
+                <h1 className="text-center text-4xl font-semibold xl:text-6xl">Espace Citoyen</h1>
+                <p className="mx-auto mt-4 max-w-2xl text-center text-lg text-black/60 dark:text-white/60 xl:text-xl">
+                    Préparez ou vérifiez un dossier foncier en toute transparence — sans inscription.
+                </p>
+
+                <motion.ul
+                    {...listMotion}
+                    className="mt-12 grid list-none grid-cols-1 gap-6 md:grid-cols-2"
+                >
+                    {JOURNEYS.map((j) => {
+                        const Icon = j.icon
+                        return (
+                            <motion.li key={j.id} {...cardMotion} className="flex">
+                                <Link
+                                    to={j.to}
+                                    className="group flex w-full flex-col rounded-3xl border border-black/10 bg-green-50 p-7 no-underline outline-none transition-all hover:-translate-y-1 hover:bg-green-100 focus-visible:ring-4 focus-visible:ring-green-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:p-9 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] dark:focus-visible:ring-offset-neutral-950"
+                                >
+                                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-green-200 text-green-900 dark:bg-green-400/20 dark:text-green-300">
+                                        <Icon className="h-6 w-6" />
+                                    </span>
+
+                                    <h2 className="mt-6 text-2xl font-semibold">{j.title}</h2>
+                                    <p className="mt-2 text-base leading-relaxed text-black/60 dark:text-white/60">
+                                        {j.description}
+                                    </p>
+
+                                    <span className="mt-8 flex items-center gap-2 font-medium text-green-700 dark:text-green-400">
+                                        {j.cta}
+                                        <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                                    </span>
+                                </Link>
+                            </motion.li>
+                        )
+                    })}
+                </motion.ul>
+            </main>
         </div>
     )
 }

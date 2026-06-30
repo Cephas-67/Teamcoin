@@ -84,7 +84,7 @@ function Hero() {
             Des documents fonciers sécurisés, traçables et vérifiables grâce aux principes de sécurité de Bitcoin.            </p>
 
           <div className="grid grid-cols-2 gap-2 mt-8 text-sm">
-            <Link to={"/onboarding"} className="px-8 py-3 font-medium bg-black dark:bg-green-500 dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center">Commencer</Link>
+            <Link to={"/onboarding"} className="px-8 py-3 font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center">Commencer</Link>
             <a href={"#fonctionnalites"} className="group flex items-center gap-2 dark:bg-white/10 border text-lg border-black/15 dark:border-white/15 rounded-2xl px-6 py-3">
               <span className="font-medium">En savoir plus</span>
               <svg className="mt-0.5 group-hover:translate-x-2 transition-transform" width="6" height="8" viewBox="0 0 6 8" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden >
@@ -263,7 +263,7 @@ function FinalCta() {
           et notre entreprise.
         </p>
         <Link to="/citizen-portal"
-          className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-green-500 dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
+          className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
         >
           Commencer maintenant
           <ArrowRight className="w-4 h-4" />

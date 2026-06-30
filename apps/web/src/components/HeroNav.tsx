@@ -16,7 +16,7 @@ export default function HeroNav() {
         <div className="z-40 fixed top-0 left-0 p-6 md:p-10 flex flex-row items-center justify-between w-full">
 
             {/* ── Logo ─────────────────────────────────────────────────────────── */}
-            <img src={logo} alt="" className="min-w-[100px] w-[8vw] max-w-[300px]"/>
+            <img src={logo} alt="" className="min-w-[100px] w-[8vw] lg:w-[10vw] max-w-[300px]"/>
             {/* ── Nav links ────────────────────────────────────────────────────── */}
             <nav
                 className="absolute left-1/2 -translate-x-1/2 hidden w-fit md:flex items-center gap-8 lg:gap-10 text-lg font-medium transition-colors duration-300 py-3 px-5 rounded-full backdrop-blur-xl dark:text-white/70 text-black/70"
