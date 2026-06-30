@@ -76,7 +76,7 @@ function Hero() {
         >
 
           <h1 className="text-4xl md:text-6xl text-center font-semibold max-w-4xl mt-5">
-            Sécurisez chaque transaction foncière grâce à Bitcoin
+            Sécurisez chaque transaction foncière grâce à <span className="text-green-800 dark:text-green-600">Gandéhou</span>
           </h1>
           <p className="md:text-base line-clamp-3 max-md:px-2 text-center max-w-2xl mt-3">
             La confiance devient vérifiable.
@@ -94,11 +94,11 @@ function Hero() {
           </div>
 
           <div aria-label="Photos of leaders" className="mt-12 flex max-md:overflow-x-auto gap-6 max-w-4xl w-full pb-6 mx-auto">
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/flagged/photo-1573740144655-bbb6e88fb18a?q=80&w=735&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=687&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=687&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1546961329-78bef0414d7c?q=80&w=687&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://images.unsplash.com/photo-1639149888905-fb39731f2e6c?q=80&w=764&auto=format&fit=crop" width={120} />
+            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img1.webp?raw=true&auto=format&fit=crop" width={120} />
+            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img2.webp?raw=true&auto=format&fit=crop" width={120} />
+            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img3.webp?raw=true&auto=format&fit=crop" width={120} />
+            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img4.webp?raw=true&auto=format&fit=crop" width={120} />
+            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img5.webp?raw=true&auto=format&fit=crop" width={120} />
           </div>
         </section>
       </motion.div>
@@ -262,10 +262,12 @@ function FinalCta() {
           Trois minutes pour notariser un acte. Une preuve qui survit à votre téléphone, votre serveur
           et notre entreprise.
         </p>
-        <LinkButton to="/notariser" variant="primary" size="lg">
+        <Link to="/citizen-portal"
+          className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-green-500 dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
+        >
           Commencer maintenant
           <ArrowRight className="w-4 h-4" />
-        </LinkButton>
+        </Link>
       </div>
     </section>
   );
