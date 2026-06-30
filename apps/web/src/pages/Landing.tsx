@@ -56,14 +56,14 @@ function Hero() {
 
   return (
     <section
-      className="relative flex flex-col items-center justify-center
-              overflow-hidden w-full min-h-screen
-              transition-colors duration-500 dark:text-white text-black "
+      className="relative flex flex-col items-center justify-start sm:justify-center
+              w-full min-h-screen py-2
+              transition-colors duration-500 dark:text-white text-black"
     >
       <motion.div
         ref={ref}
         style={{ scale, willChange: "transform" }}
-        className="relative bg-cover bg-bottom w-[98vw] h-[98vh] rounded-[30px] group origin-top"
+        className="relative bg-cover bg-bottom w-[98vw] min-h-[98vh] rounded-[24px] sm:rounded-[30px] group origin-top overflow-hidden"
       >
         <div
           style={{ backgroundImage: `url('${bg}')` }}
