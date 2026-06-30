@@ -6,6 +6,14 @@ import {
 import { ThemeToggle } from "../components/ThemeToggle";
 import { sendEmailOtp, verifyEmailOtp, signInWithPhoneDemo } from "../services/auth";
 import { PhoneInput } from "../components/PhoneInput";
+import { countries, formatPhone } from "../data/countries";
+
+function formatE164(e164: string): string {
+  const c = countries.find((x) => e164.startsWith(x.dial));
+  if (!c) return e164;
+  const digits = e164.slice(c.dial.length);
+  return `${c.dial} ${formatPhone(c, digits)}`;
+}
 
 type Method = "email" | "phone";
 type Step = "input" | "otp" | "success";
@@ -31,6 +39,9 @@ export default function Connexion() {
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
+
+  // Reset défensif : pas d'erreur qui bleed entre méthodes ou étapes.
+  useEffect(() => { setError(""); }, [step, method]);
 
   const switchMethod = (m: Method) => {
     setMethod(m);
@@ -221,7 +232,7 @@ export default function Connexion() {
             <Card>
               <Icon icon={ShieldCheck} />
               <Title>Vérification SMS</Title>
-              <Lead>Code envoyé au <span className="font-semibold text-text font-mono">{phone}</span></Lead>
+              <Lead>Code envoyé au <span className="font-semibold text-text font-mono">{formatE164(phone)}</span></Lead>
 
               <div className="mb-5 p-3 rounded-md border border-warn/30 bg-warn/10 text-xs text-warn/90 leading-relaxed text-center">
                 💡 <strong>Mode démo</strong> · le code est{" "}
