@@ -140,12 +140,11 @@ export default function HeroNav() {
             <h2
                 className="font-semibold text-[24px] transition-colors duration-300 dark:text-white text-black"
             >
-                KandoFoncier
+                Gandehou
             </h2>
-
             {/* ── Nav links ────────────────────────────────────────────────────── */}
             <nav
-                className="hidden md:flex items-center gap-8 text-sm font-medium transition-colors duration-300 p-3 rounded-full backdrop-blur-xl dark:text-white/70 text-black/70"
+                className="absolute left-1/2 -translate-x-1/2 hidden w-fit md:flex items-center gap-8 lg:gap-10 text-lg font-medium transition-colors duration-300 py-3 px-5 rounded-full backdrop-blur-xl dark:text-white/70 text-black/70"
             >
                 <a href="#fonctionnalites" className="hover:text-text transition-colors">
                     Fonctionnalités
@@ -157,9 +156,8 @@ export default function HeroNav() {
                     FAQ
                 </a>
             </nav>
-
             {/* ── Right cluster ────────────────────────────────────────────────── */}
-            <div className="ml-auto md:ml-3 flex items-center gap-2">
+            <div className="ml-auto md:ml-3 flex items-center gap-8">
 
                 {/* Dark mode toggle */}
                 <ThemeToggle />
@@ -167,19 +165,9 @@ export default function HeroNav() {
 
                 <Link
                     to="/connexion"
-                    className="px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 dark:text-white/80 dark:hover:text-white text-black/70 hover:text-black"
-                >
-                    Connexion
-                </Link>
-
-                <Link
-                    to="/connexion"
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium
-                      transition-colors duration-300 dark:bg-white dark:text-black dark:hover:bg-white/90 bg-black text-white hover:bg-black/85"
-                        
-                >
-                    <span>Accéder à l'app</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    className="px-8 py-3 bg-black dark:bg-white dark:text-black dark:hover:bg-white/30 dark:hover:text-white hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-full flex felx-row items-center gap-3"                >
+                    Accéder à l'app
+                    <ArrowRight className="w-5 h-5"/>
                 </Link>
             </div>
         </div>
