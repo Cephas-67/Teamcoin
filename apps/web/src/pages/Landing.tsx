@@ -109,7 +109,7 @@ function Hero() {
                 />
               </svg>
             </a>
-          </Reveal>
+          </div>
 
           {/* Image strip — scrollable on mobile with proper edge padding */}
           <div
@@ -140,7 +140,6 @@ function Hero() {
               />
             ))}
           </div>
-        </div>
         </div>
       </motion.div>
     </section>
@@ -222,10 +221,10 @@ function Features() {
                 </p>
               </div>
             </div>
-          </Reveal>
-        ))}
+          ))}
+        </div>
       </div>
-    </SectionCard>
+    </section>
   );
 }
 
@@ -240,66 +239,64 @@ function Stack() {
   return (
     <section id="stack" className="w-full py-20 lg:py-28">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[36px] border border-black/10 bg-gradient-to-b from-white/60 to-white/30 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_30px_80px_-30px_rgba(0,0,0,0.15)] dark:border-white/10 dark:from-black/40 dark:to-black/60 dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.07),0_40px_100px_-30px_rgba(0,0,0,0.6)]">
-          {/* Ambient glows */}
-          <div className="pointer-events-none absolute -top-28 -left-28 h-80 w-80 rounded-full bg-gandehou-green/15 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -right-28 h-96 w-96 rounded-full bg-gandehou-yellow/15 blur-3xl" />
+        <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[36px] border border-border/60 bg-gradient-to-b from-white/60 to-white/30 dark:from-black/40 dark:to-black/60 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_30px_80px_-30px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.07),0_40px_100px_-30px_rgba(0,0,0,0.6)]">
+          {/* Glows ambiants */}
+          <div className="pointer-events-none absolute -top-28 -left-28 h-80 w-80 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-blue)/0.18),transparent_70%)]" />
+          <div className="pointer-events-none absolute -bottom-24 -right-28 h-96 w-96 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-orange)/0.16),transparent_70%)]" />
 
-          <div className="relative p-8 md:p-14 lg:p-16">
+          <div className="relative p-10 md:p-14 lg:p-16">
             <div className="max-w-2xl">
-              <h2 className="bg-gradient-to-b from-neutral-900 to-neutral-900/70 bg-clip-text text-2xl sm:text-3xl font-extrabold tracking-tight text-transparent dark:from-white dark:to-white/70 md:text-4xl lg:text-5xl">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
                 Une stack pensée pour durer trente ans.
               </h2>
-              <p className="mt-4 md:mt-5 text-sm sm:text-base leading-relaxed text-neutral-900/60 dark:text-white/60 md:text-lg">
-                Bitcoin pour l'incorruptibilité temporelle, Supabase pour la
-                souplesse opérationnelle, Web Crypto pour vérifier dans le
-                navigateur sans serveur. Si nos serveurs meurent demain, les
-                preuves restent décodables par n'importe quel outil open-source.
+              <p className="mt-5 text-base md:text-lg leading-relaxed text-muted">
+                Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
+                Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
+                les preuves restent décodables par n'importe quel outil open-source.
               </p>
             </div>
 
-            <div className="mx-auto mt-10 md:mt-14 grid max-w-[640px] grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-4">
+            <div className="mx-auto mt-14 grid max-w-[640px] grid-cols-2 gap-6 sm:grid-cols-4">
               {items.map(({ Icon, name, sub }) => (
                 <div
                   key={name}
-                  className="group/tile relative flex flex-col items-center gap-3 rounded-[20px] sm:rounded-[24px] border border-black/10 bg-gradient-to-b from-white/80 to-white/40 p-4 sm:p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] transition-transform duration-300 ease-out hover:-translate-y-1 dark:border-white/10 dark:from-white/[0.04] dark:to-white/[0.02] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)]"
+                  className="group/tile relative flex flex-col items-center gap-3 rounded-[24px] border border-border/60 bg-gradient-to-b from-white/80 to-white/40 dark:from-white/[0.04] dark:to-white/[0.02] p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out hover:-translate-y-1"
                 >
-                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gandehou-green/10 ring-1 ring-black/10 dark:ring-white/10">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-gandehou-green" strokeWidth={1.8} aria-hidden />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/60 ring-1 ring-border/60">
+                    <Icon className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden />
                   </div>
                   <div className="text-center">
-                    <div className="text-xs sm:text-sm font-semibold tracking-tight">{name}</div>
-                    <div className="mt-0.5 text-[11px] sm:text-xs text-neutral-900/55 dark:text-white/55">{sub}</div>
+                    <div className="text-sm font-semibold tracking-tight">{name}</div>
+                    <div className="mt-0.5 text-xs text-muted">{sub}</div>
                   </div>
                 </div>
-              </Reveal>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </SectionCard>
+    </section>
   );
 }
 
 function FinalCta() {
   return (
     <section className="py-20 lg:py-28">
-      <div className="container mx-auto max-w-2xl px-4 text-center">
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl">
+      <div className="container text-center max-w-2xl">
+        <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight">
           Prêt à sceller votre première vente ?
         </h2>
-        <p className="mb-7 mt-3 text-sm sm:text-base text-neutral-900/60 dark:text-white/60">
-          Trois minutes pour notariser un acte. Une preuve qui survit à votre
-          téléphone, votre serveur et notre entreprise.
+        <p className="text-muted text-base mb-7">
+          Trois minutes pour notariser un acte. Une preuve qui survit à votre téléphone, votre serveur
+          et notre entreprise.
         </p>
-        <Link
-          to="/onboarding"
-          className="mx-auto flex w-full sm:w-fit items-center justify-center gap-2 rounded-2xl bg-gandehou-green px-8 py-3.5 text-lg font-medium text-white transition-colors duration-300 hover:bg-gandehou-green/90"
+        <Link to="/citizen-portal"
+          className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
         >
           Commencer maintenant
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
-    </SectionCard>
+    </section>
   );
 }
