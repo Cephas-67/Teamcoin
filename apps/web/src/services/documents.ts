@@ -1,10 +1,13 @@
 import { supabase } from "../lib/supabase";
+import { combinedHash } from "@gandehou/ledger";
 import type {
   Document,
   DocumentInput,
   DocumentType,
   OtsStatus,
 } from "../lib/types";
+import type { UploadedAudio } from "./audio";
+import type { CapturedSignature } from "./signature";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║ Service documents · PDF générés + ancrage Bitcoin via OpenTimestamps     ║
@@ -82,6 +85,76 @@ export async function createDocument(input: DocumentInput): Promise<Document> {
 // ║ Refuse si le document précédent n'est pas encore ancré (ots_proof_path   ║
 // ║ null) : chaîner sur un parent non-ancré crée une preuve faible.          ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║ Création d'un document AVEC audio et/ou signature biométrique            ║
+// ║                                                                          ║
+// ║ Calcule le sha256 ancré sur Bitcoin en combinant le PDF, l'audio et      ║
+// ║ la pubkey de la signature WebAuthn (ce qui est présent).                 ║
+// ║                                                                          ║
+// ║ Règle du combined hash :                                                 ║
+// ║   sha256 ancré = combinedHash(pdf_sha256, audio_sha256 ?? "", sig_hash) ║
+// ║                                                                          ║
+// ║ Cette logique garantit qu'une seule altération sur l'un des 3 éléments   ║
+// ║ rend la preuve Bitcoin invalide.                                         ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+export type CreateDocumentBundleInput = {
+  dossier_id: string;
+  type: DocumentType;
+  storage_bucket: string;
+  storage_path: string;
+  pdf_sha256: string;
+  hash_parent?: string | null;
+  qr_code_url?: string | null;
+  created_by?: string | null;
+
+  /** Audio uploadé via uploadAudio() · null si pas d'enregistrement vocal */
+  audio?: UploadedAudio | null;
+
+  /** Signature biométrique via captureSignature() · null si pas de Passkey */
+  signature?: CapturedSignature | null;
+};
+
+export async function createDocumentBundle(
+  input: CreateDocumentBundleInput,
+): Promise<Document> {
+  const parts: string[] = [input.pdf_sha256];
+  if (input.audio?.sha256) parts.push(input.audio.sha256);
+  if (input.signature?.publicKeyHash) parts.push(input.signature.publicKeyHash);
+
+  const ancresha256 = parts.length === 1
+    ? input.pdf_sha256
+    : await combinedHashChain(parts);
+
+  return createDocument({
+    dossier_id: input.dossier_id,
+    type: input.type,
+    storage_bucket: input.storage_bucket,
+    storage_path: input.storage_path,
+    sha256: ancresha256,
+    pdf_sha256: input.pdf_sha256,
+    hash_parent: input.hash_parent ?? null,
+    audio_storage_path: input.audio?.storagePath ?? null,
+    audio_sha256: input.audio?.sha256 ?? null,
+    signataire_pubkey_hash: input.signature?.publicKeyHash ?? null,
+    signataire_credential_id: input.signature?.credentialId ?? null,
+    signataire_pubkey_jwk: input.signature?.publicKeyJwk ?? null,
+    signataire_nom: input.signature?.signataireNom ?? null,
+    qr_code_url: input.qr_code_url ?? null,
+    created_by: input.created_by ?? null,
+  } as DocumentInput);
+}
+
+// Combine N hashes en cascade (gauche à droite) via combinedHash.
+async function combinedHashChain(hashes: string[]): Promise<string> {
+  if (hashes.length === 0) throw new Error("combinedHashChain : liste vide");
+  let acc = hashes[0];
+  for (let i = 1; i < hashes.length; i++) {
+    acc = await combinedHash(acc, hashes[i]);
+  }
+  return acc;
+}
 
 export type CreateChainedDocumentInput = Omit<DocumentInput, "hash_parent">;
 

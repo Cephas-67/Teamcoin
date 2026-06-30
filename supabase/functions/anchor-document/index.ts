@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     // 1. Lecture du document
     const { data: doc, error: docErr } = await supabase
       .from("documents")
-      .select("id, dossier_id, storage_bucket, storage_path, sha256, ots_status, ots_proof_path")
+      .select("id, dossier_id, storage_bucket, storage_path, sha256, pdf_sha256, audio_storage_path, audio_sha256, signataire_pubkey_hash, ots_status, ots_proof_path")
       .eq("id", documentId)
       .maybeSingle();
 
