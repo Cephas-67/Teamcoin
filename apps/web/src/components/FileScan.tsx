@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Upload, FileText, Image as ImageIcon, ShieldCheck, Loader2, X, Eye } from "lucide-react";
-import { sha256OfFile } from "@kando/ledger";
+import { sha256OfFile } from "@gandehou/ledger";
 import { cn } from "../lib/cn";
 
 type Props = {

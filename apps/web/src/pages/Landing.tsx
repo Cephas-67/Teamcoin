@@ -16,14 +16,19 @@ import {
 import { LinkButton } from "../components/Button";
 import { HowItWorks } from "../components/sections/HowItWorks";
 import { FAQ } from "../components/sections/FAQ";
-import SoftGradient from "@/components/backgrounds/SoftGradient";
 import HeroNav from "@/components/HeroNav";
-import bg from "../assets/images/bg.svg"
-import { ThemeToggle } from "@/components/ThemeToggle";
+import bg from "../assets/images/bg.svg";
+import img1 from "../assets/images/img1.webp";
+import img2 from "../assets/images/img2.webp";
+import img3 from "../assets/images/img3.webp";
+import img4 from "../assets/images/img4.webp";
+import img5 from "../assets/images/img5.webp";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
+
+const heroImages = [img1, img2, img3, img4, img5];
 
 
 
@@ -44,7 +49,8 @@ function Hero() {
 
   const ref = useRef(null);
   const { scrollYProgress } = useScroll();
-  const width = useTransform(scrollYProgress, [0, 0.1], ["98vw", "90vw"]);
+  // Anime SCALE (GPU, no layout reflow) au lieu de WIDTH (declenche layout a chaque frame).
+  const scale = useTransform(scrollYProgress, [0, 0.1], [1, 0.92]);
 
   return (
     <section
@@ -54,15 +60,14 @@ function Hero() {
     >
       <motion.div
         ref={ref}
-        style={{ width }}
-        className="relative bg-cover bg-bottom w-[98vw] h-[98vh] rounded-[30px] group"
+        style={{ scale, willChange: "transform" }}
+        className="relative bg-cover bg-bottom w-[98vw] h-[98vh] rounded-[30px] group origin-top"
       >
         <div
           style={{ backgroundImage: `url('${bg}')` }}
-          className="bg-contain bg- bg-bottom w-full h-full opacity-10 dark:opacity-20 absolute top-1/2 left-0"
-        >
+          className="bg-contain bg-bottom w-full h-full opacity-10 dark:opacity-20 absolute top-1/2 left-0 pointer-events-none"
+        />
 
-        </div>
 
         {/* ── Top nav ──────────────────────────────────────────────────────── */}
         <HeroNav />
@@ -93,12 +98,19 @@ function Hero() {
             </a>
           </div>
 
-          <div aria-label="Photos of leaders" className="mt-12 flex max-md:overflow-x-auto gap-6 max-w-4xl w-full pb-6 mx-auto">
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img1.webp?raw=true&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img2.webp?raw=true&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img3.webp?raw=true&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img4.webp?raw=true&auto=format&fit=crop" width={120} />
-            <img alt="" className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0" height={140} src="https://github.com/Cephas-67/Teamcoin/blob/main/apps/web/src/assets/images/img5.webp?raw=true&auto=format&fit=crop" width={120} />
+          <div aria-label="Photos" className="mt-12 flex max-md:overflow-x-auto gap-6 max-w-4xl w-full pb-6 mx-auto">
+            {heroImages.map((src, i) => (
+              <img
+                key={src}
+                alt=""
+                src={src}
+                width={144}
+                height={176}
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
+                className="w-36 h-44 rounded-lg hover:-translate-y-1 transition duration-300 object-cover flex-shrink-0"
+              />
+            ))}
           </div>
         </section>
       </motion.div>
