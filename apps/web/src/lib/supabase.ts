@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
+// ─── Client Supabase global ─────────────────────────────────────────────────
+// Toutes les requêtes (DB, Auth, Storage) passent par ce client unique.
+// Les types métier vivent dans lib/types.ts (source : supabase/schema.sql).
+
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -8,7 +12,7 @@ export const supabaseConfigured = Boolean(url && anon);
 if (!supabaseConfigured) {
   // eslint-disable-next-line no-console
   console.warn(
-    "[KandoFoncier] VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY manquants dans apps/web/.env — l'app fonctionnera en mode dégradé jusqu'à ce que tu les renseignes.",
+    "[Gandehou] VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY manquants dans apps/web/.env. L'app fonctionnera en mode dégradé jusqu'à ce que tu les renseignes.",
   );
 }
 
@@ -26,31 +30,22 @@ export const supabase = createClient(
   },
 );
 
-export type Dossier = {
-  id: string;
-  chef_id: string;
-  parcelle_ref: string;
-  parcelle_quartier: string;
-  parcelle_commune: string;
-  parcelle_superficie: number | null;
-  vendeur_nom: string;
-  vendeur_phone: string;
-  acheteur_nom: string;
-  acheteur_phone: string;
-  mode: "presentiel" | "distanciel";
-  statut: "INIT" | "VENDEUR_OK" | "ACHETEUR_OK" | "SCELLE_COUTUMIER";
-  document_hash: string | null;
-  created_at: string;
-};
+// Réexport pratique des types (un seul import pour le code applicatif).
+export type {
+  Profile,
+  ProfileRole,
+  Dossier,
+  DossierInput,
+  DossierStatut,
+  Document,
+  DocumentInput,
+  DocumentType,
+  OtsStatus,
+  StatusHistoryEntry,
+  DossierAvecDocuments,
+  DossierAvecDernierDocument,
+  Zone,
+  StorageBucket,
+} from "./types";
 
-export type Checkpoint = {
-  id: number;
-  dossier_id: string;
-  etape: "CREATION" | "VENDEUR" | "ACHETEUR" | "COUTUMIER" | "NOTAIRE" | "ANDF";
-  audio_hash: string | null;
-  document_hash: string | null;
-  current_hash: string;
-  bitcoin_proof: string | null;
-  signer_phone: string | null;
-  created_at: string;
-};
+export { STORAGE_BUCKETS } from "./types";

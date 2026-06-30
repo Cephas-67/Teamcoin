@@ -144,7 +144,7 @@ export function Silk({
   );
 
   return (
-    <Canvas dpr={1} frameloop="always">
+    <Canvas dpr={1} frameloop={paused ? "demand" : "always"}>
       <SilkPlane ref={meshRef} uniforms={uniforms} paused={paused} />
     </Canvas>
   );
