@@ -11,23 +11,22 @@ const FOOTER_COLS: FooterCol[] = [
     links: [
       { label: "Fonctionnalités", href: "/#fonctionnalites" },
       { label: "Comment ça marche", href: "/#how" },
-      { label: "Explorer le ledger", href: "/explorer" },
-    ],
-  },
-  {
-    heading: "Notarisation",
-    links: [
-      { label: "Notariser un acte", href: "/notariser" },
-      { label: "Vérifier un document", href: "/verifier" },
-      { label: "Tableau de bord", href: "/dashboard" },
-    ],
-  },
-  {
-    heading: "Ressources",
-    links: [
       { label: "FAQ", href: "/#faq" },
+    ],
+  },
+  {
+    heading: "Public",
+    links: [
+      { label: "Vérificateur", href: "/verifier" },
       { label: "OpenTimestamps", href: "https://opentimestamps.org" },
+    ],
+  },
+  {
+    heading: "Espace Chef",
+    links: [
       { label: "Connexion", href: "/connexion" },
+      { label: "Mes dossiers", href: "/dashboard" },
+      { label: "Nouveau dossier", href: "/dossier/nouveau" },
     ],
   },
 ];

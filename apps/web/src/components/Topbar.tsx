@@ -32,11 +32,11 @@ function PublicNav() {
       </nav>
       <div className="ml-auto md:ml-3 flex items-center gap-2">
         <ThemeToggle />
-        <LinkButton to="/connexion" variant="ghost" size="sm">
-          Connexion
+        <LinkButton to="/verifier" variant="ghost" size="sm">
+          Vérifier
         </LinkButton>
         <LinkButton to="/connexion" variant="primary" size="sm">
-          <span>Accéder à l'app</span>
+          <span>Espace Chef</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </LinkButton>
       </div>
