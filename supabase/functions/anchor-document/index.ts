@@ -23,6 +23,29 @@ import { sha256OfBytes, stampHash } from "../_shared/ots.ts";
 
 const OTS_BUCKET = "ots-proofs";
 
+// Combine pdf + audio + signature en cascade :
+//   acc = pdf
+//   si audio :     acc = SHA-256(acc + "::" + audio_hash)
+//   si signature : acc = SHA-256(acc + "::" + sig_hash)
+// Doit rester aligné sur combinedHash() de packages/ledger/hash.ts.
+async function computeCombinedHash(
+  pdfHash: string,
+  audioHash: string | null,
+  sigHash: string | null,
+): Promise<string> {
+  let acc = pdfHash.toLowerCase();
+  const enc = new TextEncoder();
+  for (const h of [audioHash, sigHash]) {
+    if (!h) continue;
+    const bytes = enc.encode(`${acc}::${h.toLowerCase()}`);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    acc = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return acc;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
   if (req.method !== "POST") {
@@ -79,23 +102,60 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 3. Recalcul SHA-256 + vérification cohérence
+    // 3. Recalcul SHA-256 du PDF
     const bytes = await blob.arrayBuffer();
-    const hashRecalc = await sha256OfBytes(bytes);
-    if (hashRecalc.toLowerCase() !== doc.sha256.toLowerCase()) {
+    const pdfHash = await sha256OfBytes(bytes);
+    const expectedPdfHash = (doc.pdf_sha256 ?? doc.sha256).toLowerCase();
+    if (pdfHash.toLowerCase() !== expectedPdfHash) {
       return jsonResponse(
         {
           ok: false,
-          error: "Hash divergent entre ligne DB et fichier Storage",
-          dbHash: doc.sha256,
-          fileHash: hashRecalc,
+          error: "Hash PDF divergent entre ligne DB et fichier Storage",
+          dbPdfHash: expectedPdfHash,
+          filePdfHash: pdfHash,
         },
         { status: 409 },
       );
     }
 
-    // 4. Création de la preuve OTS · contacte les calendriers publics (réseau)
-    const { proofBytes } = await stampHash(hashRecalc);
+    // 3bis. Si audio attaché : télécharger + vérifier son hash
+    if (doc.audio_storage_path) {
+      const { data: audioBlob, error: audioErr } = await supabase.storage
+        .from("documents-audio")
+        .download(doc.audio_storage_path);
+      if (audioErr || !audioBlob) {
+        throw new Error(`Téléchargement audio (${doc.audio_storage_path}) : ${audioErr?.message ?? "blob vide"}`);
+      }
+      const audioHash = await sha256OfBytes(await audioBlob.arrayBuffer());
+      if (audioHash.toLowerCase() !== (doc.audio_sha256 ?? "").toLowerCase()) {
+        return jsonResponse(
+          { ok: false, error: "Hash audio divergent", dbAudioHash: doc.audio_sha256, fileAudioHash: audioHash },
+          { status: 409 },
+        );
+      }
+    }
+
+    // 3ter. Recalculer le combined hash (ce qui SERA ancré sur Bitcoin)
+    //       = pdf_sha256 [+ audio_sha256] [+ signataire_pubkey_hash]
+    const combined = await computeCombinedHash(
+      pdfHash,
+      doc.audio_sha256 ?? null,
+      doc.signataire_pubkey_hash ?? null,
+    );
+    if (combined.toLowerCase() !== doc.sha256.toLowerCase()) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "Hash combiné divergent (PDF + audio + signature). Possible corruption ou mauvais calcul côté client.",
+          dbCombined: doc.sha256,
+          recomputedCombined: combined,
+        },
+        { status: 409 },
+      );
+    }
+
+    // 4. Création de la preuve OTS sur le combined hash
+    const { proofBytes } = await stampHash(combined);
 
     // 5. Upload de la preuve dans ots-proofs
     const proofPath = `${doc.dossier_id}/${doc.id}.ots`;
@@ -120,7 +180,10 @@ Deno.serve(async (req) => {
     return jsonResponse({
       ok: true,
       status: "pending",
-      hash: hashRecalc,
+      hash: combined,
+      pdfHash,
+      audioHash: doc.audio_sha256 ?? null,
+      signatureHash: doc.signataire_pubkey_hash ?? null,
       proofPath,
       message:
         "Preuve soumise au calendrier OpenTimestamps. Agrégation Bitcoin dans quelques heures.",

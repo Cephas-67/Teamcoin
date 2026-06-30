@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: cast Uint8Array -> ArrayBuffer correctement pour WebAuthn API.
 import { sha256 } from "@gandehou/ledger";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗

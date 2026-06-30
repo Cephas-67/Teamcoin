@@ -29,8 +29,8 @@ export default {
         info: rgbVar("k-info"),
       },
       fontFamily: {
-        sans: ["Outfit", "system-ui", "sans-serif"],
-        display: ["Outfit", "system-ui", "sans-serif"],
+        sans: ['"Work Sans"', "system-ui", "sans-serif"],
+        display: ['"Work Sans"', "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {

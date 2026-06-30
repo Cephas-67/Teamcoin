@@ -38,7 +38,7 @@
   html, body {
     background: rgb(var(--k-bg));
     color: rgb(var(--k-text));
-    font-family: "Inter", sans-serif;
+    font-family: "Work Sans", sans-serif;
     letter-spacing: -0.005em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -46,7 +46,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Epilogue", sans-serif;
+    font-family: "Work Sans", sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.15;

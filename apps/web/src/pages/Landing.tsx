@@ -195,9 +195,9 @@ function Features() {
           {features.map(({ Icon, title, description }) => (
             <div
               key={title}
-              className="flex flex-col items-start gap-4 rounded-2xl border border-border/60 bg-white/5 dark:bg-black/30 p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:border-accent/40 hover:bg-white/10 dark:hover:bg-black/40"
+              className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-surface dark:bg-black/30 p-6 backdrop-blur-lg shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface-2 dark:hover:bg-black/40"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-background/60 text-accent">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-bg/60 text-accent">
                 <Icon className="h-6 w-6" strokeWidth={1.8} aria-hidden />
               </div>
               <div>
@@ -230,7 +230,7 @@ function Stack() {
 
           <div className="relative p-10 md:p-14 lg:p-16">
             <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-text">
                 Une stack pensée pour durer trente ans.
               </h2>
               <p className="mt-5 text-base md:text-lg leading-relaxed text-muted">
@@ -246,7 +246,7 @@ function Stack() {
                   key={name}
                   className="group/tile relative flex flex-col items-center gap-3 rounded-[24px] border border-border/60 bg-gradient-to-b from-white/80 to-white/40 dark:from-white/[0.04] dark:to-white/[0.02] p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out hover:-translate-y-1"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/60 ring-1 ring-border/60">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-bg/60 ring-1 ring-border/60">
                     <Icon className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden />
                   </div>
                   <div className="text-center">
