@@ -3,6 +3,7 @@ import { ShieldCheck, CheckCircle2, AlertTriangle, Loader2, Search } from "lucid
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { FileScan } from "../components/FileScan";
+import { BackButton } from "../components/BackButton";
 import { supabase, type Dossier, type Checkpoint } from "../lib/supabase";
 
 type Verdict =
@@ -53,6 +54,10 @@ export default function Verificateur() {
 
   return (
     <>
+      <div className="mb-4">
+        <BackButton fallback="/" />
+      </div>
+
       <PageHeader
         title="Vérifier un document foncier"
         subtitle="Entre l'identifiant du dossier, ou téléverse le document à authentifier."

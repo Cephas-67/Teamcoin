@@ -6,8 +6,9 @@ import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PhoneInput } from "../components/PhoneInput";
 import { FileScan } from "../components/FileScan";
+import { BackButton } from "../components/BackButton";
 import { supabase } from "../lib/supabase";
-import { useSession } from "../hooks/useSession";
+import { useChef } from "../hooks/useChef";
 
 const inputCls = "w-full h-11 px-3.5 rounded-md bg-bg border border-border text-sm focus:border-accent focus:outline-none transition-colors";
 
@@ -15,7 +16,7 @@ type Mode = "presentiel" | "distanciel";
 
 export default function NouveauDossier() {
   const navigate = useNavigate();
-  const { user } = useSession();
+  const { chef } = useChef();
 
   const [parcelleRef, setParcelleRef] = useState("");
   const [quartier, setQuartier] = useState("");
@@ -33,7 +34,7 @@ export default function NouveauDossier() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
-    if (!user) return toast.error("Session expirée");
+    if (!chef) return toast.error("Session expirée");
     if (!parcelleRef || !quartier || !commune) return toast.error("Champs parcelle requis");
     if (!vendeurNom || !vendeurPhoneOk) return toast.error("Vendeur incomplet");
     if (!acheteurNom || !acheteurPhoneOk) return toast.error("Acheteur incomplet");
@@ -43,7 +44,7 @@ export default function NouveauDossier() {
       const { data, error } = await supabase
         .from("dossiers")
         .insert({
-          chef_id: user.id,
+          chef_id: chef.id,
           parcelle_ref: parcelleRef,
           parcelle_quartier: quartier,
           parcelle_commune: commune,
@@ -78,6 +79,10 @@ export default function NouveauDossier() {
 
   return (
     <>
+      <div className="mb-4">
+        <BackButton fallback="/dashboard" />
+      </div>
+
       <PageHeader
         eyebrowIcon={FilePlus2}
         eyebrow="Création"

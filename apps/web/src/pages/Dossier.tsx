@@ -2,15 +2,19 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Share2, Copy, CheckCircle2, AlertCircle, Loader2, Mic, Bitcoin, FileText, ArrowLeft,
+  Share2, Copy, CheckCircle2, AlertCircle, Loader2, Mic, Bitcoin, FileText, Download,
 } from "lucide-react";
+import { BackButton } from "../components/BackButton";
+import { generateOfficialPdf } from "../lib/pdf";
 import { supabase, type Dossier, type Checkpoint } from "../lib/supabase";
 import { sha256, sha256OfFile, combinedHash } from "@kando/ledger";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { SmsOtpVerify } from "../components/SmsOtpVerify";
 import { AudioRecorder } from "../components/AudioRecorder";
-import { useSession } from "../hooks/useSession";
+import { FingerprintCapture } from "../components/FingerprintCapture";
+import { FileScan } from "../components/FileScan";
+import { useChef } from "../hooks/useChef";
 
 type Role = "chef" | "vendeur" | "acheteur";
 
@@ -60,8 +64,8 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 // ─── VUE CHEF ────────────────────────────────────────────────────────────────
 function ChefView({ dossier, checkpoints, onReload }: { dossier: Dossier; checkpoints: Checkpoint[]; onReload: () => void }) {
-  const { user } = useSession();
-  const isOwner = user?.id === dossier.chef_id;
+  const { chef } = useChef();
+  const isOwner = chef?.id === dossier.chef_id;
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const vendeurLink = `${baseUrl}/dossier/${dossier.id}?role=vendeur`;
@@ -99,9 +103,7 @@ function ChefView({ dossier, checkpoints, onReload }: { dossier: Dossier; checkp
   return (
     <>
       <div className="mb-4">
-        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-          <ArrowLeft className="w-4 h-4" /> Retour
-        </Link>
+        <BackButton fallback="/dashboard" />
       </div>
 
       <PageHeader
@@ -257,13 +259,21 @@ function HistoryCard({ dossierId, checkpoints }: { dossierId: string; checkpoint
 function SignerView({ dossier, role, onReload }: { dossier: Dossier; role: "vendeur" | "acheteur"; onReload: () => void }) {
   const name = role === "vendeur" ? dossier.vendeur_nom : dossier.acheteur_nom;
   const phone = role === "vendeur" ? dossier.vendeur_phone : dossier.acheteur_phone;
+  const otherName = role === "vendeur" ? dossier.acheteur_nom : dossier.vendeur_nom;
   const alreadyDone =
     (role === "vendeur" && dossier.statut !== "INIT") ||
     (role === "acheteur" && (dossier.statut === "ACHETEUR_OK" || dossier.statut === "SCELLE_COUTUMIER"));
 
   const [phoneOk, setPhoneOk] = useState(false);
   const [audio, setAudio] = useState<Blob | null>(null);
+  const [cipFile, setCipFile] = useState<File | null>(null);
+  const [cipHash, setCipHash] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const cipNeeded = role === "acheteur";
+  const cipOk = !cipNeeded || (cipFile !== null && cipHash !== null);
+  const allOk = phoneOk && audio !== null && cipOk && signature !== null;
 
   if (alreadyDone) {
     return (
@@ -278,18 +288,20 @@ function SignerView({ dossier, role, onReload }: { dossier: Dossier; role: "vend
   }
 
   const submit = async () => {
-    if (!phoneOk) return toast.error("Vérifie d'abord ton numéro");
-    if (!audio) return toast.error("Enregistrement audio requis");
+    if (!allOk) return toast.error("Complète toutes les étapes");
     setSubmitting(true);
     try {
-      const audioHash = await sha256OfFile(audio);
-      const currentHash = await combinedHash(dossier.document_hash ?? dossier.id, audioHash);
+      const audioHash = await sha256OfFile(audio!);
+      const base = dossier.document_hash ?? dossier.id;
+      // Hash combiné · enchaîne document + audio + cip (si présent) + signature
+      const parts = [base, audioHash, cipHash ?? "", signature!].filter(Boolean).join("::");
+      const currentHash = await sha256(new TextEncoder().encode(parts));
 
       await supabase.from("dossier_checkpoints").insert({
         dossier_id: dossier.id,
         etape: role === "vendeur" ? "VENDEUR" : "ACHETEUR",
         audio_hash: audioHash,
-        document_hash: dossier.document_hash,
+        document_hash: cipHash ?? dossier.document_hash,
         current_hash: currentHash,
         signer_phone: phone,
       });
@@ -308,6 +320,10 @@ function SignerView({ dossier, role, onReload }: { dossier: Dossier; role: "vend
 
   return (
     <div className="max-w-xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallback="/" />
+      </div>
+
       <div className="text-center mb-6">
         <span className="text-xs uppercase tracking-wider text-accent">Espace {role}</span>
         <h1 className="text-2xl font-bold mt-1">Bienvenue {name}</h1>
@@ -316,26 +332,58 @@ function SignerView({ dossier, role, onReload }: { dossier: Dossier; role: "vend
         </p>
       </div>
 
-      <section className="bg-surface border border-border rounded-xl p-5 mb-4">
-        <h2 className="text-sm font-semibold mb-3">1 · Vérification de ton numéro</h2>
+      <Step n={1} title="Vérification de ton numéro" done={phoneOk}>
         <SmsOtpVerify phone={phone} onVerified={() => setPhoneOk(true)} />
-      </section>
+      </Step>
 
       {phoneOk && (
-        <section className="bg-surface border border-border rounded-xl p-5 mb-4">
-          <h2 className="text-sm font-semibold mb-1">2 · Consentement vocal</h2>
+        <Step n={2} title="Consentement vocal en langue locale" done={!!audio}>
           <p className="text-sm text-muted mb-4">
-            Dis dans ta langue : « Moi, {name}, je {role === "vendeur" ? "vends ma parcelle à" : "achète la parcelle de"} {role === "vendeur" ? dossier.acheteur_nom : dossier.vendeur_nom}, en pleine conscience. »
+            Dis dans ta langue : « Moi, {name}, je {role === "vendeur" ? "vends ma parcelle à" : "achète la parcelle de"} {otherName}, en pleine conscience. »
           </p>
           <AudioRecorder onRecorded={setAudio} />
-        </section>
+        </Step>
       )}
 
-      {phoneOk && audio && (
+      {phoneOk && audio && cipNeeded && (
+        <Step n={3} title="Pièce d'identité (CIP ou IFU)" done={cipOk}>
+          <FileScan
+            label=""
+            hint="Téléverse une photo claire de ta CIP ou ton IFU."
+            onChange={(file, hash) => { setCipFile(file); setCipHash(hash); }}
+          />
+        </Step>
+      )}
+
+      {phoneOk && audio && cipOk && (
+        <Step n={cipNeeded ? 4 : 3} title="Signature biométrique" done={!!signature}>
+          <FingerprintCapture onCaptured={setSignature} />
+        </Step>
+      )}
+
+      {allOk && (
         <Button variant="primary" size="lg" className="w-full" onClick={submit} disabled={submitting}>
           {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Mic className="w-4 h-4" />Valider ma signature</>}
         </Button>
       )}
     </div>
+  );
+}
+
+function Step({ n, title, done, children }: { n: number; title: string; done: boolean; children: React.ReactNode }) {
+  return (
+    <section className="bg-surface border border-border rounded-xl p-5 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold inline-flex items-center gap-2">
+          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+            done ? "bg-accent text-accent-contrast" : "bg-surface-2 text-muted border border-border"
+          }`}>
+            {done ? "✓" : n}
+          </span>
+          {title}
+        </h2>
+      </div>
+      {children}
+    </section>
   );
 }

@@ -34,7 +34,10 @@ export function Sidebar({ open, onClose }: Props) {
 
   const handleLogout = async () => {
     await logout();
+    // logout() vide à la fois Supabase ET localStorage de la session démo.
     navigate("/connexion", { replace: true });
+    // Force re-render des hooks · sinon useChef garde l'ancien chef en cache.
+    window.location.reload();
   };
 
   return (

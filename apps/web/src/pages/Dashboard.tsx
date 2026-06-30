@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { KpiCard } from "../components/KpiCard";
 import { LinkButton } from "../components/Button";
 import { supabase, type Dossier } from "../lib/supabase";
-import { useSession } from "../hooks/useSession";
+import { useChef } from "../hooks/useChef";
 
 const STATUT_LABEL: Record<Dossier["statut"], string> = {
   INIT: "En attente vendeur",
@@ -22,22 +22,22 @@ const STATUT_TONE: Record<Dossier["statut"], string> = {
 };
 
 export default function Dashboard() {
-  const { user } = useSession();
+  const { chef } = useChef();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!chef) return;
     supabase
       .from("dossiers")
       .select("*")
-      .eq("chef_id", user.id)
+      .eq("chef_id", chef.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         setDossiers(data ?? []);
         setLoading(false);
       });
-  }, [user]);
+  }, [chef]);
 
   const total = dossiers.length;
   const enCours = dossiers.filter((d) => d.statut !== "SCELLE_COUTUMIER").length;

@@ -84,7 +84,7 @@ export function HowItWorks() {
   const lineFill = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
 
   return (
-    <section id="how" ref={viewRef} className="relative bg-bg">
+    <section id="how" ref={viewRef} className="relative">
       {/* DESKTOP — sticky-scroll */}
       <div ref={ref} className="relative hidden h-[500vh] md:block">
         <div

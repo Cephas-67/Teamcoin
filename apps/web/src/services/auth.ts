@@ -3,36 +3,7 @@ import type { User } from "@supabase/supabase-js";
 
 export type AuthUser = User;
 
-// Mot de passe synthétique pour l'auth téléphone (démo).
-// On dérive l'email du numéro pour garder un user stable par téléphone.
-const PHONE_DOMAIN = "kando.demo";
-const PHONE_PASSWORD = "kando-phone-demo-2026";
-
-function phoneToEmail(e164: string): string {
-  return `${e164.replace("+", "")}@${PHONE_DOMAIN}`;
-}
-
-export async function signInWithPhoneDemo(e164: string): Promise<AuthUser> {
-  const email = phoneToEmail(e164);
-  // Tente la connexion · si l'user n'existe pas, on l'inscrit puis on retente.
-  const tryIn = await supabase.auth.signInWithPassword({ email, password: PHONE_PASSWORD });
-  if (tryIn.data.user) return tryIn.data.user;
-
-  const signUp = await supabase.auth.signUp({
-    email,
-    password: PHONE_PASSWORD,
-    options: { data: { phone: e164, auth_method: "phone-demo" } },
-  });
-  if (signUp.error) throw new Error(signUp.error.message);
-  if (signUp.data.session?.user) return signUp.data.session.user;
-
-  // Pas de session immédiate · re-tente le login (cas où email confirmation est OFF).
-  const retry = await supabase.auth.signInWithPassword({ email, password: PHONE_PASSWORD });
-  if (retry.error) throw new Error(retry.error.message);
-  if (!retry.data.user) throw new Error("Connexion impossible · vérifie que 'Confirm email' est désactivé dans Supabase");
-  return retry.data.user;
-}
-
+// ─── Auth Email · Supabase (réel) ───────────────────────────────────────────
 export async function sendEmailOtp(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -47,26 +18,73 @@ export async function sendEmailOtp(email: string): Promise<void> {
 }
 
 export async function verifyEmailOtp(email: string, token: string): Promise<AuthUser> {
-  const { data, error } = await supabase.auth.verifyOtp({
-    email,
-    token,
-    type: "email",
-  });
+  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error("Utilisateur introuvable après vérification");
   return data.user;
 }
 
-export async function getSession() {
-  const { data } = await supabase.auth.getSession();
-  return data.session;
+// ─── Auth Téléphone · pure simulation (zéro Supabase) ───────────────────────
+// Pour la démo : l'OTP 040305 valide n'importe quel numéro et stocke un
+// "chef de démo" en localStorage. Aucun appel réseau, aucun email envoyé.
+
+const DEMO_SESSION_KEY = "kando-demo-session";
+const DEMO_CHEFS_KEY = "kando-demo-chefs";
+
+export type DemoSession = {
+  chefId: string;
+  phone: string;
+  since: number;
+};
+
+export function loginWithPhoneDemo(e164: string): DemoSession {
+  // UUID stable par numéro · même phone → même chef_id à chaque login.
+  const chefs = readChefMap();
+  if (!chefs[e164]) {
+    chefs[e164] = crypto.randomUUID();
+    localStorage.setItem(DEMO_CHEFS_KEY, JSON.stringify(chefs));
+  }
+  const session: DemoSession = { chefId: chefs[e164], phone: e164, since: Date.now() };
+  localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(session));
+  return session;
 }
 
-export async function getUser(): Promise<AuthUser | null> {
+export function getDemoSession(): DemoSession | null {
+  try {
+    const raw = localStorage.getItem(DEMO_SESSION_KEY);
+    return raw ? (JSON.parse(raw) as DemoSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readChefMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(DEMO_CHEFS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// ─── Identité unifiée (utilisée par les pages) ──────────────────────────────
+export type Chef = {
+  id: string;
+  source: "email" | "phone-demo";
+  email?: string;
+  phone?: string;
+};
+
+export async function getCurrentChef(): Promise<Chef | null> {
   const { data } = await supabase.auth.getUser();
-  return data.user;
+  if (data.user) return { id: data.user.id, source: "email", email: data.user.email ?? undefined };
+  const demo = getDemoSession();
+  if (demo) return { id: demo.chefId, source: "phone-demo", phone: demo.phone };
+  return null;
 }
 
+// ─── Session globale ────────────────────────────────────────────────────────
 export async function logout(): Promise<void> {
+  localStorage.removeItem(DEMO_SESSION_KEY);
   await supabase.auth.signOut();
 }

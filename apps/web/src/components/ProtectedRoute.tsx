@@ -1,10 +1,10 @@
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
-import { useSession } from "../hooks/useSession";
+import { useChef } from "../hooks/useChef";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const { session, loading } = useSession();
+  const { chef, loading } = useChef();
 
   if (loading) {
     return (
@@ -14,7 +14,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!session) {
+  if (!chef) {
     return <Navigate to="/connexion" state={{ from: location.pathname }} replace />;
   }
 
