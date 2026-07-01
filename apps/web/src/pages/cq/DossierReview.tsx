@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import QRCode from 'qrcode'
 import {
-  ArrowLeft, Bitcoin, Check, CheckCircle2, Loader2, MessageCircle,
+  ArrowLeft, Bitcoin, Check, CheckCircle2, Download, FileText, Loader2, MessageCircle,
   ShieldCheck, X,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { StatusChip } from '@/components/StatusChip'
 import { supabase } from '@/lib/supabase'
+import { STORAGE_BUCKETS } from '@/lib/types'
+import { generateAttestationPdf } from '@/lib/attestationPdf'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '../../public/logo.svg'
 import { cn } from '@/lib/cn'
@@ -58,6 +60,10 @@ export default function DossierReview() {
   const [confirmed, setConfirmed] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [attestationNum, setAttestationNum] = useState('')
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [pdfFilename, setPdfFilename] = useState('')
+  const [pdfPublicUrl, setPdfPublicUrl] = useState('')
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -68,22 +74,113 @@ export default function DossierReview() {
       .single()
       .then(({ data, error }) => {
         if (error || !data) { setFetchError(error?.message ?? 'Dossier introuvable.'); setLoading(false); return }
-        setDossier(data as Dossier)
+        const d = data as Dossier
+        setDossier(d)
         // If already confirmed, go straight to the attestation screen.
-        if ((data as Dossier).statut === 'atteste_cq') buildAttestation(id)
+        if (d.statut === 'atteste_cq') buildAttestation(d)
         setLoading(false)
       })
   }, [id])
 
-  const buildAttestation = async (dossierId: string) => {
-    const num = `ATT-CQ-${dossierId.slice(0, 8).toUpperCase()}`
-    const link = `${window.location.origin}/verifier/${dossierId}`
-    try {
-      const url = await QRCode.toDataURL(link, { width: 220, margin: 1 })
-      setQrDataUrl(url)
-    } catch { /* QR unavailable — still show the rest */ }
+  const buildAttestation = async (d: Dossier) => {
+    const num = `ATT-CQ-${d.id.slice(0, 8).toUpperCase()}`
+    const link = `${window.location.origin}/verifier/${d.id}`
+
     setAttestationNum(num)
     setConfirmed(true)
+    setGeneratingPdf(true)
+
+    // QR à l'écran (indépendant du PDF · non-bloquant)
+    QRCode.toDataURL(link, { width: 220, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => { /* QR indisponible · reste utilisable */ })
+
+    // Génération du PDF (avec QR intégré + métadonnées cachées)
+    try {
+      const { blob, sha256, filename } = await generateAttestationPdf({
+        dossier: d as unknown as import('@/lib/types').Dossier,
+        attestationNum: num,
+        cqSignerLabel: chef?.email ?? chef?.phone,
+        verifyUrl: link,
+      })
+      setPdfBlob(blob)
+      setPdfFilename(filename)
+
+      // Upload sur Supabase Storage (best-effort) → URL publique pour WhatsApp.
+      // Nécessite un bucket public "documents-provisoires" (créé côté Supabase).
+      const path = `${d.id}/${filename}`
+      const { error: upErr } = await supabase.storage
+        .from(STORAGE_BUCKETS.PROVISOIRES)
+        .upload(path, blob, { contentType: 'application/pdf', upsert: true })
+
+      if (!upErr) {
+        const { data: pub } = supabase.storage
+          .from(STORAGE_BUCKETS.PROVISOIRES)
+          .getPublicUrl(path)
+        setPdfPublicUrl(pub.publicUrl)
+
+        // Insère (ou met à jour) la ligne documents · le twin affichera alors
+        // "provisional_cq" au lieu de "brouillon".
+        await supabase.from('documents').upsert({
+          dossier_id: d.id,
+          type: 'attestation_provisoire',
+          storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+          storage_path: path,
+          sha256,
+          pdf_sha256: sha256,
+          ots_status: 'pending',
+          qr_code_url: link,
+        }, { onConflict: 'dossier_id,type' })
+      } else {
+        console.warn('[Gandehou] Upload PDF échoué — téléchargement local seul.', upErr.message)
+      }
+    } catch (e) {
+      console.error('[Gandehou] Génération PDF échouée', e)
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  // Télécharge le PDF localement.
+  const handleDownload = () => {
+    if (!pdfBlob) return
+    const url = URL.createObjectURL(pdfBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = pdfFilename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  // Partage WhatsApp : préfère le partage natif de fichier (mobile),
+  // fallback sur wa.me avec le lien de téléchargement public.
+  const handleWhatsApp = async () => {
+    if (!dossier) return
+    const shareLink = `${window.location.origin}/verifier/${dossier.id}`
+    const introTxt =
+      `Bonjour, voici l'attestation de voisinage Gandehou pour le dossier ${attestationNum}.`
+
+    // Tentative de partage natif du fichier (mobile Android/iOS récents)
+    if (pdfBlob && typeof navigator !== 'undefined' && 'canShare' in navigator) {
+      const file = new File([pdfBlob], pdfFilename, { type: 'application/pdf' })
+      const shareData = { files: [file], title: attestationNum, text: introTxt }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((navigator as any).canShare?.(shareData)) {
+        try {
+          await (navigator as unknown as { share: (d: unknown) => Promise<void> }).share(shareData)
+          return
+        } catch { /* utilisateur a annulé · on retombe sur wa.me */ }
+      }
+    }
+
+    // Fallback web · message texte avec lien de téléchargement direct si dispo
+    const downloadPart = pdfPublicUrl
+      ? `\nTélécharger le PDF : ${pdfPublicUrl}`
+      : ''
+    const waMsg = `${introTxt}${downloadPart}\nVérifier en ligne : ${shareLink}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener,noreferrer')
   }
 
   const handleConfirm = async () => {
@@ -101,7 +198,7 @@ export default function DossierReview() {
     if (error) { setOtpError(error.message); setConfirming(false); return }
 
     setModalOpen(false)
-    await buildAttestation(id!)
+    if (dossier) await buildAttestation({ ...dossier, statut: 'atteste_cq' })
     setConfirming(false)
   }
 
@@ -115,8 +212,6 @@ export default function DossierReview() {
 
   // ── Attestation share screen (post-confirmation) ─────────────────────────
   if (confirmed) {
-    const shareLink = `${window.location.origin}/verifier/${dossier.id}`
-    const waMsg = `Bonjour, voici l'attestation de voisinage Gandehou pour le dossier ${attestationNum}. Lien de vérification : ${shareLink}`
     return (
       <div className="min-h-screen bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
         <PageHeader backTo="/cq/dashboard" />
@@ -126,7 +221,7 @@ export default function DossierReview() {
           </div>
           <h1 className="mt-5 text-2xl font-semibold">Attestation émise</h1>
           <p className="mt-2 text-sm text-neutral-900/60 dark:text-white/60">
-            Le bon voisinage a été confirmé. L'attestation provisoire est prête à partager.
+            Le bon voisinage a été confirmé. Le PDF officiel est prêt à partager.
           </p>
 
           {/* Attestation card */}
@@ -150,22 +245,54 @@ export default function DossierReview() {
             )}
 
             <p className="mt-3 text-xs text-neutral-900/50 dark:text-white/50">
-              Document provisoire — sans valeur de titre de propriété.
+              QR déjà intégré au PDF · sans valeur de titre de propriété.
             </p>
           </div>
 
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
+          {/* État de la génération PDF */}
+          {generatingPdf && (
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-neutral-900/60 dark:text-white/60">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Génération du PDF officiel…
+            </div>
+          )}
+
+          {/* Actions · WhatsApp (primaire) puis Téléchargement (secondaire) */}
+          <button
+            type="button"
+            onClick={handleWhatsApp}
+            disabled={!pdfBlob}
+            className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-50"
           >
             <MessageCircle className="h-6 w-6" />
-            Envoyer par WhatsApp
-          </a>
+            Partager sur WhatsApp
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!pdfBlob}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green disabled:opacity-50 dark:border-white/10 dark:hover:bg-white/10"
+          >
+            <Download className="h-5 w-5" />
+            Télécharger le PDF
+          </button>
+
+          {pdfPublicUrl && (
+            <a
+              href={pdfPublicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 text-xs text-gandehou-green underline outline-none focus-visible:ring-2 focus-visible:ring-gandehou-green"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Ouvrir le PDF hébergé
+            </a>
+          )}
+
           <Link
             to="/cq/dashboard"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:border-white/10 dark:hover:bg-white/10"
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl px-6 py-3 text-sm font-medium text-neutral-900/60 outline-none transition-colors hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:text-white/60 dark:hover:text-white"
           >
             Retour au tableau de bord
           </Link>
