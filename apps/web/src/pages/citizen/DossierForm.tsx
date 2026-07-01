@@ -7,7 +7,10 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PortalNav } from '@/components/PortalNav'
 import Stepper, { Step } from '@/components/Stepper'
+import { AudioRecorder } from '@/components/AudioRecorder'
+import { FingerprintCapture, type CapturedSignature } from '@/components/FingerprintCapture'
 import { supabase } from '@/lib/supabase'
+import { uploadCitizenAudio, uploadCitizenPiece } from '@/services/citizenCaptures'
 
 /* ------------------------------------------------------------------ *
  * Validation helpers
@@ -129,9 +132,10 @@ const STEP_FIELDS: (keyof DossierValues)[][] = [
     ['departement', 'commune', 'arrondissement', 'quartier'],
     ['superficie_m2', 'zone', 'origine_droit'],
     ['voisin_nord', 'voisin_sud', 'voisin_est', 'voisin_ouest'],
-    [],
+    [], // documents (plan + pieces)
+    [], // consentements (audio + empreinte)
 ]
-const STEP_LABELS = ['Vendeur', 'Acheteur', 'Localisation', 'Parcelle', 'Voisinage', 'Documents']
+const STEP_LABELS = ['Vendeur', 'Acheteur', 'Localisation', 'Parcelle', 'Voisinage', 'Documents', 'Consentements']
 
 const inputCls =
     'w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-black outline-none transition ' +
@@ -167,7 +171,12 @@ export default function DossierForm() {
     const [submitted, setSubmitted] = useState<{ id: string; phone: string } | null>(null)
     const [submitting, setSubmitting] = useState(false)
     const [plan, setPlan] = useState<File[]>([])
-    const [pieces, setPieces] = useState<File[]>([])
+    const [pieceVendeur, setPieceVendeur] = useState<File[]>([])
+    const [pieceAcheteur, setPieceAcheteur] = useState<File[]>([])
+    const [audioVendeur, setAudioVendeur] = useState<Blob | null>(null)
+    const [audioAcheteur, setAudioAcheteur] = useState<Blob | null>(null)
+    const [sigVendeur, setSigVendeur] = useState<CapturedSignature | null>(null)
+    const [sigAcheteur, setSigAcheteur] = useState<CapturedSignature | null>(null)
     const [docError, setDocError] = useState('')
     const [draftRestored, setDraftRestored] = useState(!!initialDraft)
 
@@ -225,41 +234,46 @@ export default function DossierForm() {
         if (await trigger(STEP_FIELDS[step - 1])) setStep((s) => s + 1)
     }
     const handleComplete = async () => {
-        if (plan.length === 0) {
-            setDocError('Ajoutez au moins le plan du géomètre.')
-            return
-        }
-        const invalidFiles = [...plan, ...pieces].filter(
-            (f) => !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type),
-        )
-        if (invalidFiles.length > 0) {
-            setDocError('Formats acceptés : JPEG, PNG, WebP, PDF.')
-            return
-        }
-        const oversized = [...plan, ...pieces].filter((f) => f.size > 10 * 1024 * 1024)
-        if (oversized.length > 0) {
-            setDocError('Taille maximale par fichier : 10 Mo.')
-            return
-        }
+        // Etape 6 obligatoire : plan + 2 pieces d'identite (vendeur + acheteur)
+        if (plan.length === 0) return setDocError('Ajoutez le plan du géomètre.')
+        if (pieceVendeur.length === 0) return setDocError("Ajoutez la pièce d'identité du vendeur.")
+        if (pieceAcheteur.length === 0) return setDocError("Ajoutez la pièce d'identité de l'acheteur.")
+
         setDocError('')
 
         const v = getValues()
         setSubmitting(true)
 
-        // Auto-detection CIP vs passeport (13 chiffres = CIP beninois)
         const detectIdType = (val: string): 'cip' | 'passeport' =>
             /^\d{13}$/.test(val.trim()) ? 'cip' : 'passeport'
         const vendeurIdType = detectIdType(v.vendeur_cip)
         const acheteurIdType = detectIdType(v.acheteur_cip)
 
+        // Genere l'UUID cote client pour pouvoir uploader AVANT d'inserer.
+        const dossierId = crypto.randomUUID()
+
         try {
+            // 1. Upload en parallele des pieces d'identite (bucket prive)
+            const [vp, ap] = await Promise.all([
+                uploadCitizenPiece(dossierId, 'vendeur', pieceVendeur[0]),
+                uploadCitizenPiece(dossierId, 'acheteur', pieceAcheteur[0]),
+            ])
+
+            // 2. Upload en parallele des audios (facultatifs)
+            const [va, aa] = await Promise.all([
+                audioVendeur ? uploadCitizenAudio(dossierId, 'vendeur', audioVendeur) : Promise.resolve(null),
+                audioAcheteur ? uploadCitizenAudio(dossierId, 'acheteur', audioAcheteur) : Promise.resolve(null),
+            ])
+
+            // 3. INSERT dossier avec tous les paths / hashes
             const { data, error } = await supabase
                 .from('dossiers')
                 .insert({
+                    id: dossierId,
                     statut: 'soumis',
                     vendeur_nom: v.vendeur_nom,
-                    vendeur_id_type: vendeurIdType,      // 'cip' | 'passeport'
-                    vendeur_id_value: v.vendeur_cip,     // le champ du form s'appelle _cip mais contient l'id (CIP ou passeport)
+                    vendeur_id_type: vendeurIdType,
+                    vendeur_id_value: v.vendeur_cip,
                     vendeur_phone: v.vendeur_phone,
                     acheteur_nom: v.acheteur_nom,
                     acheteur_id_type: acheteurIdType,
@@ -277,6 +291,23 @@ export default function DossierForm() {
                     voisin_sud: v.voisin_sud,
                     voisin_est: v.voisin_est,
                     voisin_ouest: v.voisin_ouest,
+                    // Captures citoyen · seront copiees dans documents au moment CQ
+                    vendeur_piece_id_path: vp.path,
+                    vendeur_piece_id_sha256: vp.sha256,
+                    vendeur_piece_id_mime: vp.mime,
+                    acheteur_piece_id_path: ap.path,
+                    acheteur_piece_id_sha256: ap.sha256,
+                    acheteur_piece_id_mime: ap.mime,
+                    vendeur_audio_path: va?.path ?? null,
+                    vendeur_audio_sha256: va?.sha256 ?? null,
+                    acheteur_audio_path: aa?.path ?? null,
+                    acheteur_audio_sha256: aa?.sha256 ?? null,
+                    vendeur_pubkey_hash: sigVendeur?.publicKeyHash ?? null,
+                    vendeur_credential_id: sigVendeur?.credentialId ?? null,
+                    vendeur_signataire_nom: sigVendeur?.signataireNom ?? null,
+                    acheteur_pubkey_hash: sigAcheteur?.publicKeyHash ?? null,
+                    acheteur_credential_id: sigAcheteur?.credentialId ?? null,
+                    acheteur_signataire_nom: sigAcheteur?.signataireNom ?? null,
                 })
                 .select('id')
                 .single()
@@ -490,15 +521,84 @@ export default function DossierForm() {
                                 </fieldset>
                             </Step>
 
-                            {/* 6 — Documents */}
+                            {/* 6 — Documents (plan + photos pieces d'identite par partie) */}
                             <Step>
                                 <div className="space-y-5">
                                     <h2 className="text-xl font-semibold">Pièces justificatives</h2>
                                     <p className="text-sm text-neutral-900/60 dark:text-white/60">
-                                        Formats acceptés : JPEG, PNG, WebP, PDF · 10 Mo max par fichier.
+                                        Chaque partie doit fournir la photo de sa pièce d'identité (visage visible).
+                                        Formats : JPEG, PNG, WebP, HEIC, PDF · 5 Mo max.
                                     </p>
-                                    <FilePick id="plan" label="Plan du géomètre" hint="Photo ou PDF — obligatoire" accept=".jpg,.jpeg,.png,.webp,.pdf" files={plan} onFiles={setPlan} />
-                                    <FilePick id="pieces" label="Pièces d'identité" hint="Photos des CIP / passeports" accept=".jpg,.jpeg,.png,.webp" multiple files={pieces} onFiles={setPieces} />
+                                    <FilePick
+                                        id="plan"
+                                        label="Plan du géomètre"
+                                        hint="Photo ou PDF — obligatoire"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={plan}
+                                        onFiles={setPlan}
+                                    />
+                                    <FilePick
+                                        id="piece_vendeur"
+                                        label="Pièce d'identité du vendeur"
+                                        hint="Photo de la CIP ou du passeport (visage visible)"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={pieceVendeur}
+                                        onFiles={setPieceVendeur}
+                                    />
+                                    <FilePick
+                                        id="piece_acheteur"
+                                        label="Pièce d'identité de l'acheteur"
+                                        hint="Photo de la CIP ou du passeport (visage visible)"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={pieceAcheteur}
+                                        onFiles={setPieceAcheteur}
+                                    />
+                                    {docError && <p className="text-sm text-gandehou-red" role="alert">{docError}</p>}
+                                </div>
+                            </Step>
+
+                            {/* 7 — Consentements (audio + empreinte par partie) */}
+                            <Step>
+                                <div className="space-y-6">
+                                    <div>
+                                        <h2 className="text-xl font-semibold">Consentement des parties</h2>
+                                        <p className="mt-1 text-sm text-neutral-900/60 dark:text-white/60">
+                                            Chaque partie enregistre un court message vocal (10-30 secondes)
+                                            confirmant la transaction, puis appose son empreinte biométrique.
+                                            Le tout est ancré sur Bitcoin avec le PDF.
+                                        </p>
+                                    </div>
+
+                                    <fieldset className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                                        <legend className="px-2 text-sm font-semibold text-gandehou-green">
+                                            Vendeur · {watch('vendeur_nom') || 'nom non renseigné'}
+                                        </legend>
+                                        <div className="space-y-4">
+                                            <AudioRecorder onRecorded={setAudioVendeur} />
+                                            <FingerprintCapture
+                                                signataireNom={watch('vendeur_nom') || 'Vendeur'}
+                                                onCaptured={setSigVendeur}
+                                            />
+                                        </div>
+                                    </fieldset>
+
+                                    <fieldset className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                                        <legend className="px-2 text-sm font-semibold text-gandehou-green">
+                                            Acheteur · {watch('acheteur_nom') || 'nom non renseigné'}
+                                        </legend>
+                                        <div className="space-y-4">
+                                            <AudioRecorder onRecorded={setAudioAcheteur} />
+                                            <FingerprintCapture
+                                                signataireNom={watch('acheteur_nom') || 'Acheteur'}
+                                                onCaptured={setSigAcheteur}
+                                            />
+                                        </div>
+                                    </fieldset>
+
+                                    <p className="text-xs text-neutral-900/50 dark:text-white/50">
+                                        Les consentements audio et biométrique sont recommandés mais restent facultatifs si votre appareil ne les prend pas en charge.
+                                    </p>
+
                                     {docError && <p className="text-sm text-gandehou-red" role="alert">{docError}</p>}
                                 </div>
                             </Step>

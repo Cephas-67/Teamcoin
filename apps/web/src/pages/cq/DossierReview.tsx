@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase'
 import { STORAGE_BUCKETS } from '@/lib/types'
 import { generateAttestationPdf } from '@/lib/attestationPdf'
 import { anchorDocument } from '@/services/anchor'
+import { combinedHashCascade } from '@gandehou/ledger'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '@/public/logo.svg'
 import { cn } from '@/lib/cn'
@@ -37,11 +38,18 @@ type Dossier = {
     vendeur_id_type: 'cip' | 'passeport' | null
     vendeur_id_value: string | null
     vendeur_phone: string | null
+    // Captures citoyen · copiees dans documents a l'attestation
+    vendeur_audio_path: string | null; vendeur_audio_sha256: string | null
+    vendeur_pubkey_hash: string | null; vendeur_credential_id: string | null; vendeur_signataire_nom: string | null
+    vendeur_piece_id_path: string | null; vendeur_piece_id_sha256: string | null
     acheteur_nom: string
     acheteur_id_type: 'cip' | 'passeport' | null
     acheteur_id_value: string | null
     acheteur_phone: string | null
     acheteur_nationalite: string | null
+    acheteur_audio_path: string | null; acheteur_audio_sha256: string | null
+    acheteur_pubkey_hash: string | null; acheteur_credential_id: string | null; acheteur_signataire_nom: string | null
+    acheteur_piece_id_path: string | null; acheteur_piece_id_sha256: string | null
     departement: string | null; commune: string | null
     arrondissement: string | null; quartier: string | null
     superficie_m2: number | null
@@ -135,7 +143,19 @@ export default function DossierReview() {
                     .getPublicUrl(path)
                 setPdfPublicUrl(pub.publicUrl)
 
-                // Upsert de la ligne documents (retourne l'id pour l'ancrage)
+                // Cascade bipartite : le combined hash inclut les captures citoyen
+                // deja stockees sur le dossier au moment de la soumission.
+                const combinedSha256 = await combinedHashCascade({
+                    pdf: sha256,
+                    vendeurAudio: d.vendeur_audio_sha256,
+                    vendeurSig: d.vendeur_pubkey_hash,
+                    acheteurAudio: d.acheteur_audio_sha256,
+                    acheteurSig: d.acheteur_pubkey_hash,
+                })
+
+                // Upsert de la ligne documents (retourne l'id pour l'ancrage).
+                // On copie les captures citoyen depuis le dossier ; anchor-document
+                // recalculera la meme cascade cote serveur pour valider.
                 const { data: docRow, error: docErr } = await supabase
                     .from('documents')
                     .upsert({
@@ -143,10 +163,20 @@ export default function DossierReview() {
                         type: 'attestation_provisoire',
                         storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
                         storage_path: path,
-                        sha256,
+                        sha256: combinedSha256,
                         pdf_sha256: sha256,
                         ots_status: 'pending',
                         qr_code_url: link,
+                        vendeur_audio_path: d.vendeur_audio_path,
+                        vendeur_audio_sha256: d.vendeur_audio_sha256,
+                        vendeur_pubkey_hash: d.vendeur_pubkey_hash,
+                        vendeur_credential_id: d.vendeur_credential_id,
+                        vendeur_signataire_nom: d.vendeur_signataire_nom,
+                        acheteur_audio_path: d.acheteur_audio_path,
+                        acheteur_audio_sha256: d.acheteur_audio_sha256,
+                        acheteur_pubkey_hash: d.acheteur_pubkey_hash,
+                        acheteur_credential_id: d.acheteur_credential_id,
+                        acheteur_signataire_nom: d.acheteur_signataire_nom,
                     }, { onConflict: 'dossier_id,type' })
                     .select('id')
                     .single()
