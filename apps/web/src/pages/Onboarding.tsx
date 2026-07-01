@@ -20,7 +20,7 @@ type Role = {
 const ROLES: Role[] = [
     { id: 'citoyen', label: 'Citoyen', to: ROUTES.citoyenSpace },
     { id: 'chef-quartier', label: 'Chef quartier', to: ROUTES.auth, authRole: 'chef-quartier' },
-    { id: 'agent', label: 'Agent Mairie / Notaire', to: ROUTES.auth, authRole: 'agent' },
+    { id: 'agent', label: 'Notaire', to: ROUTES.auth, authRole: 'agent' },
 ]
 
 const list: Variants = {

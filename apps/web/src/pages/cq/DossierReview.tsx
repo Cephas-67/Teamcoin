@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import QRCode from 'qrcode'
 import {
-    ArrowLeft, Check, CheckCircle2, Loader2, MessageCircle,
+    ArrowLeft, Check, CheckCircle2, Download, Loader2, MessageCircle,
     ShieldCheck, X,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -34,7 +34,6 @@ type Dossier = {
 
 const DEMO_OTP = '040305'
 
-// Flow: review → OTP modal → capture (audio + fingerprint) → attestation share
 type FlowStep = 'review' | 'capture' | 'confirmed'
 
 export default function DossierReview() {
@@ -60,127 +59,115 @@ export default function DossierReview() {
     // Attestation
     const [qrDataUrl, setQrDataUrl] = useState('')
     const [attestationNum, setAttestationNum] = useState('')
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
-  const [pdfFilename, setPdfFilename] = useState('')
-  const [pdfPublicUrl, setPdfPublicUrl] = useState('')
-  const [generatingPdf, setGeneratingPdf] = useState(false)
+    const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+    const [pdfFilename, setPdfFilename] = useState('')
+    const [pdfPublicUrl, setPdfPublicUrl] = useState('')
+    const [generatingPdf, setGeneratingPdf] = useState(false)
 
     useEffect(() => {
         if (!id) return
         supabase.from('dossiers').select('*').eq('id', id).single()
             .then(({ data, error }) => {
                 if (error || !data) { setFetchError(error?.message ?? 'Dossier introuvable.'); setLoading(false); return }
-                setDossier(data as Dossier)
-                if ((data as Dossier).statut === 'atteste_cq') {
-                    buildAttestation(id)
-                    setFlowStep('confirmed')
+                const d = data as Dossier
+                setDossier(d)
+                if (d.statut === 'atteste_cq') {
+                    buildAttestation(d) // ← FIX: pass Dossier, not string
                 }
                 setLoading(false)
             })
     }, [id])
 
-  const buildAttestation = async (d: Dossier) => {
-    const num = `ATT-CQ-${d.id.slice(0, 8).toUpperCase()}`
-    const link = `${window.location.origin}/verifier/${d.id}`
+    const buildAttestation = async (d: Dossier) => {
+        const num = `ATT-CQ-${d.id.slice(0, 8).toUpperCase()}`
+        const link = `${window.location.origin}/verifier/${d.id}`
 
-    setAttestationNum(num)
-    setConfirmed(true)
-    setGeneratingPdf(true)
+        setAttestationNum(num)
+        setFlowStep('confirmed') // ← FIX: was setConfirmed(true) which doesn't exist
+        setGeneratingPdf(true)
 
-    // QR à l'écran (indépendant du PDF · non-bloquant)
-    QRCode.toDataURL(link, { width: 220, margin: 1 })
-      .then(setQrDataUrl)
-      .catch(() => { /* QR indisponible · reste utilisable */ })
+        // QR for the screen (non-blocking)
+        QRCode.toDataURL(link, { width: 220, margin: 1 })
+            .then(setQrDataUrl)
+            .catch(() => { })
 
-    // Génération du PDF (avec QR intégré + métadonnées cachées)
-    try {
-      const { blob, sha256, filename } = await generateAttestationPdf({
-        dossier: d as unknown as import('@/lib/types').Dossier,
-        attestationNum: num,
-        cqSignerLabel: chef?.email ?? chef?.phone,
-        verifyUrl: link,
-      })
-      setPdfBlob(blob)
-      setPdfFilename(filename)
-
-      // Upload sur Supabase Storage (best-effort) → URL publique pour WhatsApp.
-      // Nécessite un bucket public "documents-provisoires" (créé côté Supabase).
-      const path = `${d.id}/${filename}`
-      const { error: upErr } = await supabase.storage
-        .from(STORAGE_BUCKETS.PROVISOIRES)
-        .upload(path, blob, { contentType: 'application/pdf', upsert: true })
-
-      if (!upErr) {
-        const { data: pub } = supabase.storage
-          .from(STORAGE_BUCKETS.PROVISOIRES)
-          .getPublicUrl(path)
-        setPdfPublicUrl(pub.publicUrl)
-
-        // Insère (ou met à jour) la ligne documents · le twin affichera alors
-        // "provisional_cq" au lieu de "brouillon".
-        await supabase.from('documents').upsert({
-          dossier_id: d.id,
-          type: 'attestation_provisoire',
-          storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
-          storage_path: path,
-          sha256,
-          pdf_sha256: sha256,
-          ots_status: 'pending',
-          qr_code_url: link,
-        }, { onConflict: 'dossier_id,type' })
-      } else {
-        console.warn('[Gandehou] Upload PDF échoué — téléchargement local seul.', upErr.message)
-      }
-    } catch (e) {
-      console.error('[Gandehou] Génération PDF échouée', e)
-    } finally {
-      setGeneratingPdf(false)
-    }
-  }
-
-  // Télécharge le PDF localement.
-  const handleDownload = () => {
-    if (!pdfBlob) return
-    const url = URL.createObjectURL(pdfBlob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = pdfFilename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
-  // Partage WhatsApp : préfère le partage natif de fichier (mobile),
-  // fallback sur wa.me avec le lien de téléchargement public.
-  const handleWhatsApp = async () => {
-    if (!dossier) return
-    const shareLink = `${window.location.origin}/verifier/${dossier.id}`
-    const introTxt =
-      `Bonjour, voici l'attestation de voisinage Gandehou pour le dossier ${attestationNum}.`
-
-    // Tentative de partage natif du fichier (mobile Android/iOS récents)
-    if (pdfBlob && typeof navigator !== 'undefined' && 'canShare' in navigator) {
-      const file = new File([pdfBlob], pdfFilename, { type: 'application/pdf' })
-      const shareData = { files: [file], title: attestationNum, text: introTxt }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((navigator as any).canShare?.(shareData)) {
+        // PDF generation
         try {
-          await (navigator as unknown as { share: (d: unknown) => Promise<void> }).share(shareData)
-          return
-        } catch { /* utilisateur a annulé · on retombe sur wa.me */ }
-      }
+            const { blob, sha256, filename } = await generateAttestationPdf({
+                dossier: d as unknown as import('@/lib/types').Dossier,
+                attestationNum: num,
+                cqSignerLabel: chef?.email ?? chef?.phone,
+                verifyUrl: link,
+            })
+            setPdfBlob(blob)
+            setPdfFilename(filename)
+
+            const path = `${d.id}/${filename}`
+            const { error: upErr } = await supabase.storage
+                .from(STORAGE_BUCKETS.PROVISOIRES)
+                .upload(path, blob, { contentType: 'application/pdf', upsert: true })
+
+            if (!upErr) {
+                const { data: pub } = supabase.storage
+                    .from(STORAGE_BUCKETS.PROVISOIRES)
+                    .getPublicUrl(path)
+                setPdfPublicUrl(pub.publicUrl)
+
+                await supabase.from('documents').upsert({
+                    dossier_id: d.id,
+                    type: 'attestation_provisoire',
+                    storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+                    storage_path: path,
+                    sha256,
+                    pdf_sha256: sha256,
+                    ots_status: 'pending',
+                    qr_code_url: link,
+                }, { onConflict: 'dossier_id,type' })
+            } else {
+                console.warn('[Gandehou] Upload PDF échoué — téléchargement local seul.', upErr.message)
+            }
+        } catch (e) {
+            console.error('[Gandehou] Génération PDF échouée', e)
+        } finally {
+            setGeneratingPdf(false)
+        }
     }
 
-    // Fallback web · message texte avec lien de téléchargement direct si dispo
-    const downloadPart = pdfPublicUrl
-      ? `\nTélécharger le PDF : ${pdfPublicUrl}`
-      : ''
-    const waMsg = `${introTxt}${downloadPart}\nVérifier en ligne : ${shareLink}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener,noreferrer')
-  }
+    const handleDownload = () => {
+        if (!pdfBlob) return
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = pdfFilename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
 
-    // OTP confirmed → advance to capture step
+    const handleWhatsApp = async () => {
+        if (!dossier) return
+        const shareLink = `${window.location.origin}/verifier/${dossier.id}`
+        const introTxt = `Bonjour, voici l'attestation de voisinage Gandehou pour le dossier ${attestationNum}.`
+
+        // Native file share on mobile
+        if (pdfBlob && typeof navigator !== 'undefined' && 'canShare' in navigator) {
+            const file = new File([pdfBlob], pdfFilename, { type: 'application/pdf' })
+            const shareData = { files: [file], title: attestationNum, text: introTxt }
+            if ((navigator as any).canShare?.(shareData)) {
+                try {
+                    await (navigator as unknown as { share: (d: unknown) => Promise<void> }).share(shareData)
+                    return
+                } catch { /* user cancelled — fall through to wa.me */ }
+            }
+        }
+
+        // Fallback: wa.me with download link
+        const downloadPart = pdfPublicUrl ? `\nTélécharger le PDF : ${pdfPublicUrl}` : ''
+        const waMsg = `${introTxt}${downloadPart}\nVérifier en ligne : ${shareLink}`
+        window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener,noreferrer')
+    }
+
     const handleOtpConfirm = async () => {
         if (otp.length < 6) return setOtpError('Entrez le code à 6 chiffres.')
         if (otp !== DEMO_OTP) { setOtpError('Code incorrect. (démo : 040305)'); setOtp(''); return }
@@ -190,33 +177,20 @@ export default function DossierReview() {
         const { error } = await supabase.from('dossiers').update({ statut: 'atteste_cq' }).eq('id', id!)
         if (error) { setOtpError(error.message); setConfirming(false); return }
 
-    setModalOpen(false)
-    if (dossier) await buildAttestation({ ...dossier, statut: 'atteste_cq' })
-    setConfirming(false)
-  }
+        setModalOpen(false)
+        setConfirming(false)
+        setFlowStep('capture') // → audio + fingerprint step
+    }
 
-    // Auto-verify OTP on 6 digits
     useEffect(() => {
         if (otp.length === 6 && modalOpen) handleOtpConfirm()
     }, [otp])
 
-    // After capture → create the document bundle and build attestation
     const handleFinalSubmit = async () => {
+        if (!dossier) return
         setSubmitting(true)
-        // TODO(api): replace with createDocumentBundle from @/services:
-        //   const doc = await createDocumentBundle({
-        //     dossier_id: id!,
-        //     type: 'attestation_provisoire',
-        //     storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
-        //     storage_path: `${id}/attestation.pdf`,
-        //     pdf_sha256: pdfHash,
-        //     audio: audioBlob ? { blob: audioBlob } : null,
-        //     signature,
-        //   })
-        //   await uploadPdfProvisoire(id!, doc.id, pdfBlob)
-        //   await anchorDocument(doc.id)
-        await buildAttestation(id!)
-        setFlowStep('confirmed')
+        // TODO(api): replace with createDocumentBundle from @/services
+        await buildAttestation({ ...dossier, statut: 'atteste_cq' }) // ← FIX: pass Dossier, not string
         setSubmitting(false)
     }
 
@@ -225,8 +199,6 @@ export default function DossierReview() {
 
     // ── Attestation share screen ─────────────────────────────────────
     if (flowStep === 'confirmed') {
-        const shareLink = `${window.location.origin}/verifier/${dossier.id}`
-        const waMsg = `Bonjour, voici l'attestation de voisinage Gandehou pour le dossier ${attestationNum}. Lien : ${shareLink}`
         return (
             <div className="min-h-screen bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
                 <PageHeader backTo="/cq/dashboard" />
@@ -236,25 +208,58 @@ export default function DossierReview() {
                     </div>
                     <h1 className="mt-5 text-2xl font-semibold">Attestation émise</h1>
                     <p className="mt-2 text-sm text-neutral-900/60 dark:text-white/60">
-                        Le bon voisinage a été confirmé{audioBlob ? ', l\'audio de consentement enregistré' : ''}{signature ? ' et la signature biométrique capturée' : ''}.
+                        Le bon voisinage a été confirmé{audioBlob ? ", l'audio de consentement enregistré" : ''}{signature ? ' et la signature biométrique capturée' : ''}.
                     </p>
+
                     <div className="mt-8 rounded-2xl border border-gandehou-green/30 bg-gandehou-green/10 p-6">
                         <div className="flex items-center justify-center gap-2 text-sm font-medium text-gandehou-green">
                             <ShieldCheck className="h-4 w-4" />{attestationNum}
                         </div>
                         <StatusChip status="atteste_cq" className="mx-auto mt-3" />
-                        {qrDataUrl ? (
-                            <img src={qrDataUrl} alt="QR code" className="mx-auto mt-5 h-[140px] w-[140px] rounded-xl" />
-                        ) : (
-                            <div className="mx-auto mt-5 flex h-[140px] w-[140px] items-center justify-center rounded-xl bg-black/5 text-xs dark:bg-white/5">QR indisponible</div>
+
+                        {/* PDF generation loading state */}
+                        {generatingPdf && (
+                            <div className="mt-5 flex items-center justify-center gap-2 text-sm text-neutral-900/60 dark:text-white/60">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Génération du PDF…
+                            </div>
                         )}
-                        <p className="mt-3 text-xs text-neutral-900/50 dark:text-white/50">Document provisoire — sans valeur de titre de propriété.</p>
+
+                        {qrDataUrl && !generatingPdf ? (
+                            <img src={qrDataUrl} alt="QR code" className="mx-auto mt-5 h-[140px] w-[140px] rounded-xl" />
+                        ) : !generatingPdf ? (
+                            <div className="mx-auto mt-5 flex h-[140px] w-[140px] items-center justify-center rounded-xl bg-black/5 text-xs dark:bg-white/5">QR indisponible</div>
+                        ) : null}
+
+                        <p className="mt-3 text-xs text-neutral-900/50 dark:text-white/50">
+                            Document provisoire — sans valeur de titre de propriété.
+                        </p>
                     </div>
-                    <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"
-                        className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40">
-                        <MessageCircle className="h-6 w-6" />Envoyer par WhatsApp
-                    </a>
-                    <Link to="/cq/dashboard" className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10">
+
+                    {/* ← FIX: use handleWhatsApp (native share + fallback) instead of hardcoded wa.me */}
+                    <button
+                        type="button"
+                        onClick={handleWhatsApp}
+                        disabled={generatingPdf}
+                        className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-60"
+                    >
+                        <MessageCircle className="h-6 w-6" />
+                        Envoyer par WhatsApp
+                    </button>
+
+                    {/* ← FIX: download button was missing despite handleDownload being defined */}
+                    {pdfBlob && (
+                        <button
+                            type="button"
+                            onClick={handleDownload}
+                            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:border-white/10 dark:hover:bg-white/10"
+                        >
+                            <Download className="h-5 w-5" />
+                            Télécharger le PDF
+                        </button>
+                    )}
+
+                    <Link to="/cq/dashboard" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10">
                         Retour au tableau de bord
                     </Link>
                 </main>
@@ -272,12 +277,10 @@ export default function DossierReview() {
                     <p className="mx-auto mb-8 max-w-sm text-center text-sm text-neutral-900/60 dark:text-white/60">
                         Enregistrez le consentement vocal et capturez l'empreinte biométrique avant de sceller l'attestation.
                     </p>
-
                     <div className="space-y-5">
                         <AudioRecorder onRecorded={setAudioBlob} />
                         <FingerprintCapture signataireNom={dossier.vendeur_nom} onCaptured={setSignature} />
                     </div>
-
                     <div className="mt-8 flex flex-col gap-3">
                         <button
                             type="button"
@@ -309,7 +312,6 @@ export default function DossierReview() {
                     <span className="font-mono text-xs text-neutral-900/40 dark:text-white/40">{dossier.id.slice(0, 8).toUpperCase()}</span>
                     <StatusChip status="brouillon" />
                 </div>
-
                 <div className="space-y-4">
                     <Section title="Vendeur">
                         <Row label="Noms et prénoms" value={dossier.vendeur_nom} />
@@ -392,7 +394,6 @@ function PageHeader({ backTo }: { backTo: string }) {
         </header>
     )
 }
-
 function FullPageLoader() {
     return <div className="flex min-h-screen items-center justify-center bg-gandehou-paper dark:bg-neutral-950"><Loader2 className="h-8 w-8 animate-spin text-gandehou-green" /></div>
 }

@@ -86,8 +86,8 @@ export default function App() {
           <Route path="/" element={<Landing />} />
 
           {/* Smart dashboard redirect */}
-          {/* <Route path="/dashboard" element={<SmartDashboard />} /> */}
-          <Route path="/dashboard" element={<MairieDashboard />} />
+          <Route path="/dashboard" element={<SmartDashboard />} />
+          {/* <Route path="/dashboard" element={<MairieDashboard />} /> */}
 
           {/* Skip if already authed */}
           <Route element={<RedirectIfAuthed redirectTo="/dashboard" />}>

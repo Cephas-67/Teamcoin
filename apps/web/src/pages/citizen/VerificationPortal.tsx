@@ -92,7 +92,7 @@ export default function VerificationPortal() {
               </div>
 
               {/* DEV ONLY — remove once wired to the API. Reviews each verdict design. */}
-              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-neutral-900/40 dark:text-white/40">
+              {/* <div className="mt-6 flex items-center justify-center gap-2 text-xs text-neutral-900/40 dark:text-white/40">
                 <span>Aperçu démo :</span>
                 {(['provisional', 'authentic', 'tampered'] as Verdict[]).map((v) => (
                   <button
@@ -107,7 +107,7 @@ export default function VerificationPortal() {
                     {v === 'provisional' ? 'Provisoire' : v === 'authentic' ? 'Authentique' : 'Altéré'}
                   </button>
                 ))}
-              </div>
+              </div> */}
             </>
           )}
 
