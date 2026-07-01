@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { CheckCircle2, Clock, Copy, FileText, MessageCircle, Upload, X } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, Upload, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PortalNav } from '@/components/PortalNav'
@@ -676,19 +676,7 @@ function FilePick({ id, label, hint, accept, multiple = false, files, onFiles }:
     )
 }
 
-function DossierSuccess({ id, phone }: { id: string; phone: string }) {
-    const [copied, setCopied] = useState(false)
-    const shortId = id.slice(0, 8).toUpperCase()
-    const link = `${window.location.origin}/verifier/${id}`
-
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(shortId)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        } catch { /* clipboard indisponible */ }
-    }
-
+function DossierSuccess({ id: _id, phone }: { id: string; phone: string }) {
     return (
         <div className="mx-auto max-w-md text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gandehou-yellow/20">
@@ -700,31 +688,13 @@ function DossierSuccess({ id, phone }: { id: string; phone: string }) {
                 Vous serez notifié dès qu'il aura été validé.
             </p>
 
-            <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl border border-black/10 bg-gandehou-yellow/15 px-5 py-4 dark:border-white/10">
-                <span className="font-mono text-lg font-bold tracking-wide text-amber-700 dark:text-gandehou-yellow">{shortId}</span>
-                <button type="button" onClick={copy} aria-label="Copier l'identifiant" className="rounded-lg p-2 text-amber-700 outline-none transition-colors hover:bg-black/5 focus-visible:ring-4 focus-visible:ring-gandehou-yellow/30 dark:text-gandehou-yellow">
-                    <Copy className="h-5 w-5" />
-                </button>
-            </div>
-            {copied && <p className="mt-2 text-sm text-gandehou-green">Identifiant copié</p>}
-
             <Link
                 to={`/citizen-portal?phone=${encodeURIComponent(phone)}`}
-                className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
+                className="mt-10 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
             >
                 <CheckCircle2 className="h-6 w-6" />
                 Voir mes dossiers
             </Link>
-
-            <a
-                href={`https://wa.me/?text=${encodeURIComponent(`Bonjour, mon dossier foncier Gandehou (ID ${shortId}) est en attente d'attestation. Suivi : ${link}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:border-white/10 dark:hover:bg-white/10"
-            >
-                <MessageCircle className="h-5 w-5" />
-                Partager par WhatsApp
-            </a>
 
             <p className="mt-6 text-xs leading-relaxed text-neutral-900/50 dark:text-white/50">
                 Document en attente — sans valeur de titre de propriété. Gandehou sécurise la preuve
