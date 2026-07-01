@@ -40,10 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     const c = await getCurrentChef()
     setChef(c)
-    // Role only exists for real Supabase users (email auth).
-    // Phone-demo sessions have no profiles row yet.
     if (c?.source === 'email' && c.id) {
       setRole(await fetchRole(c.id))
+    } else if (c?.source === 'phone-demo') {
+      // Phone-demo n'a pas de profil Supabase (login purement local).
+      // On lui assigne chef_quartier par defaut pour la demo, sinon
+      // SmartDashboard bloque sur "Compte en attente de configuration".
+      setRole('chef_quartier')
     } else {
       setRole(null)
     }
