@@ -24,11 +24,12 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null)
 
 async function fetchRole(userId: string): Promise<Role> {
+    // maybeSingle : les phone-demo n'ont pas de ligne profiles → evite la 406.
     const { data } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
     return (data?.role as Role) ?? null
 }
 
