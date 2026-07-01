@@ -125,13 +125,6 @@ export default function CqDashboard() {
           </p>
         </div>
 
-        <Link
-          to="/citizen-portal"
-          className="flex items-center justify-center gap-2 rounded-2xl bg-gandehou-green px-8 py-3.5 text-lg font-medium text-white transition-colors duration-300 hover:bg-gandehou-green/90"
-        >
-          Lancer une transaction
-        </Link>
-
         {/* ── Action bar ──────────────────────────────────────────── */}
         <div className="mb-5 flex items-center justify-between">
           <span className="text-sm font-medium text-neutral-900/60 dark:text-white/60">

@@ -18,6 +18,7 @@ export type ChipStatus =
   | 'soumis'
   | 'atteste_cq'
   | 'valide_mairie'
+  | 'litige'
   | 'ots_pending'
   | 'ots_confirmed'
   | 'ots_mismatch'
@@ -35,10 +36,11 @@ const TONE: Record<Tone, string> = {
 }
 
 const CONFIG: Record<ChipStatus, { label: string; tone: Tone; icon: typeof FileText }> = {
-  brouillon: { label: 'Brouillon', tone: 'neutral', icon: FileText },
+  brouillon: { label: 'Suspendu par le CQ', tone: 'yellow', icon: FileWarning },
   soumis: { label: 'Soumis · en attente CQ', tone: 'yellow', icon: Clock },
-  atteste_cq: { label: 'Attesté CQ · provisoire', tone: 'yellow', icon: FileWarning },
+  atteste_cq: { label: 'Validé par le CQ', tone: 'green', icon: ShieldCheck },
   valide_mairie: { label: 'Validé Mairie', tone: 'green', icon: ShieldCheck },
+  litige: { label: 'Rejeté', tone: 'red', icon: ShieldAlert },
   ots_pending: { label: 'Ancrage en attente', tone: 'yellow', icon: Clock },
   ots_confirmed: { label: 'Ancrage confirmé', tone: 'green', icon: ShieldCheck },
   ots_mismatch: { label: 'Altéré', tone: 'red', icon: ShieldAlert },

@@ -279,6 +279,28 @@ export default function DossierReview() {
         setAttesting(false)
     }
 
+    // Suspendre : renvoie le dossier au citoyen pour correction (statut='brouillon')
+    const handleSuspendre = async () => {
+        if (!dossier) return
+        if (!confirm('Suspendre ce dossier ? Le citoyen devra le corriger avant de le resoumettre.')) return
+        setAttesting(true); setAttestError('')
+        const { error } = await supabase.from('dossiers').update({ statut: 'brouillon' }).eq('id', dossier.id)
+        setAttesting(false)
+        if (error) return setAttestError(error.message)
+        window.location.href = '/cq/dashboard'
+    }
+
+    // Rejeter : marque le dossier en litige (definitif)
+    const handleRejeter = async () => {
+        if (!dossier) return
+        if (!confirm('Rejeter definitivement ce dossier ? Cette action ne pourra pas etre annulee.')) return
+        setAttesting(true); setAttestError('')
+        const { error } = await supabase.from('dossiers').update({ statut: 'litige' }).eq('id', dossier.id)
+        setAttesting(false)
+        if (error) return setAttestError(error.message)
+        window.location.href = '/cq/dashboard'
+    }
+
     const handleDownload = () => {
         if (!pdfBlob) return
         const url = URL.createObjectURL(pdfBlob)
@@ -488,9 +510,9 @@ export default function DossierReview() {
                     </p>
                 )}
 
-                {/* Fixed bottom CTA · bouton unique Attester */}
+                {/* Fixed bottom CTA · Valider / Suspendre / Rejeter */}
                 <div className="fixed bottom-0 left-0 right-0 border-t border-black/10 bg-gandehou-paper px-4 py-4 dark:border-white/10 dark:bg-neutral-950">
-                    <div className="mx-auto max-w-xl">
+                    <div className="mx-auto max-w-xl space-y-2">
                         <button
                             type="button"
                             onClick={handleAttester}
@@ -498,15 +520,29 @@ export default function DossierReview() {
                             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gandehou-green py-4 text-lg font-semibold text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-60"
                         >
                             {attesting ? (
-                                <><Loader2 className="h-5 w-5 animate-spin" />Attestation en cours…</>
+                                <><Loader2 className="h-5 w-5 animate-spin" />En cours…</>
                             ) : (
-                                <><ShieldCheck className="h-5 w-5" />Attester le dossier</>
+                                <><ShieldCheck className="h-5 w-5" />Valider le dossier</>
                             )}
                         </button>
-                        <p className="mt-3 text-center text-xs text-neutral-900/50 dark:text-white/50">
-                            Votre clic vaut signature électronique. Vous attestez avoir vérifié les
-                            informations et convoqué les deux parties.
-                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={handleSuspendre}
+                                disabled={attesting}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-gandehou-yellow/40 bg-gandehou-yellow/10 py-3 text-sm font-medium text-amber-700 outline-none transition-colors hover:bg-gandehou-yellow/20 focus-visible:ring-2 focus-visible:ring-gandehou-yellow disabled:opacity-60 dark:text-gandehou-yellow"
+                            >
+                                Suspendre
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRejeter}
+                                disabled={attesting}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-gandehou-red/40 bg-gandehou-red/10 py-3 text-sm font-medium text-gandehou-red outline-none transition-colors hover:bg-gandehou-red/20 focus-visible:ring-2 focus-visible:ring-gandehou-red disabled:opacity-60"
+                            >
+                                Rejeter
+                            </button>
+                        </div>
                     </div>
                 </div>
             </main>
