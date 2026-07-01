@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import logo from "../assets/logo.svg";
+import logo from "../public/logo.svg";
 
 // Menu mobile fullscreen · inspire de GemmaS mais en Framer Motion
 // (au lieu de GSAP). Plus simple et prévisible, AnimatePresence gere

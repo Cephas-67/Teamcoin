@@ -3,7 +3,7 @@ import { ArrowRight, Menu } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { LinkButton } from "./Button";
 import { ThemeToggle } from "./ThemeToggle";
-import logo from "../assets/logo.svg";
+import logo from "../public/logo.svg";
 
 
 type Props = {
