@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -143,21 +143,66 @@ const selectCls = inputCls + ' appearance-none bg-[length:16px] bg-[right_12px_c
 /* ------------------------------------------------------------------ *
  * Component
  * ------------------------------------------------------------------ */
+
+// Cle localStorage pour la persistance du brouillon (survit au refresh).
+// Les fichiers (plan + pieces) ne sont PAS persistes : les objets File ne sont
+// pas serializables et poser ce probleme depasse le scope du hackathon.
+const DRAFT_KEY = 'gandehou:dossier_form_draft'
+
+type Draft = { step: number; values: Partial<DossierValues> }
+
+function loadDraft(): Draft | null {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (typeof parsed?.step === 'number' && parsed?.values) return parsed as Draft
+        return null
+    } catch { return null }
+}
+
 export default function DossierForm() {
-    const [step, setStep] = useState(1)
+    const initialDraft = loadDraft()
+    const [step, setStep] = useState(initialDraft?.step ?? 1)
     const [submitted, setSubmitted] = useState<{ id: string; phone: string } | null>(null)
     const [submitting, setSubmitting] = useState(false)
     const [plan, setPlan] = useState<File[]>([])
     const [pieces, setPieces] = useState<File[]>([])
     const [docError, setDocError] = useState('')
+    const [draftRestored, setDraftRestored] = useState(!!initialDraft)
 
     const {
         register,
         trigger,
         getValues,
         watch,
+        reset,
         formState: { errors },
-    } = useForm<DossierValues>({ resolver: zodResolver(schema), mode: 'onTouched' })
+    } = useForm<DossierValues>({
+        resolver: zodResolver(schema),
+        mode: 'onTouched',
+        defaultValues: (initialDraft?.values ?? {}) as Partial<DossierValues>,
+    })
+
+    // Persistance auto-save : a chaque changement du formulaire, on ecrit le
+    // draft dans localStorage. Debounced via useEffect naturel (watch renvoie
+    // les valeurs a chaque rerender, on ecrit une fois par batch React).
+    const watchedAll = watch()
+    useEffect(() => {
+        if (submitted) return
+        try {
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, values: watchedAll }))
+        } catch { /* quota depasse · non-bloquant */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, JSON.stringify(watchedAll), submitted])
+
+    // Bouton "recommencer" · vide le draft et le formulaire
+    const discardDraft = () => {
+        try { localStorage.removeItem(DRAFT_KEY) } catch { /* prive */ }
+        reset({} as DossierValues)
+        setStep(1)
+        setDraftRestored(false)
+    }
 
     // Règles ANDF non bloquantes (avertissements).
     const nat = watch('acheteur_nationalite')
@@ -248,6 +293,8 @@ export default function DossierForm() {
 
             // Sauvegarde le telephone localement pour la page de suivi.
             try { localStorage.setItem('gandehou:citizen_phone', v.vendeur_phone) } catch { /* privee */ }
+            // Efface le brouillon persiste
+            try { localStorage.removeItem(DRAFT_KEY) } catch { /* prive */ }
 
             setSubmitted({ id: data.id, phone: v.vendeur_phone })
         } catch (e) {
@@ -267,10 +314,28 @@ export default function DossierForm() {
                 ) : (
                     <>
                         <h1 className="mb-2 text-center text-3xl font-semibold xl:text-5xl">Initier un dossier</h1>
-                        <p className="mx-auto mb-10 max-w-xl text-center text-neutral-900/60 dark:text-white/60">
+                        <p className="mx-auto mb-6 max-w-xl text-center text-neutral-900/60 dark:text-white/60">
                             Préparez votre dossier depuis votre téléphone. Vos informations restent locales
                             jusqu'à l'envoi.
                         </p>
+
+                        {draftRestored && (
+                            <div
+                                role="status"
+                                className="mx-auto mb-8 flex max-w-xl flex-col gap-2 rounded-2xl border border-gandehou-green/30 bg-gandehou-green/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <span className="text-neutral-900/80 dark:text-white/80">
+                                    Brouillon restauré · vous continuez à l'étape {step}.
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={discardDraft}
+                                    className="shrink-0 text-xs font-medium text-gandehou-green underline outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-gandehou-green"
+                                >
+                                    Recommencer à zéro
+                                </button>
+                            </div>
+                        )}
 
                         <Stepper
                             currentStep={step}
