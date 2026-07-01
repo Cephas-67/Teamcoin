@@ -1,25 +1,34 @@
 import { supabase } from "../lib/supabase";
-import { combinedHash } from "@gandehou/ledger";
+import { combinedHashCascade } from "@gandehou/ledger";
 import type {
   Document,
   DocumentInput,
   DocumentType,
   OtsStatus,
 } from "../lib/types";
-import type { UploadedAudio } from "./audio";
+import type { Party, UploadedAudio } from "./audio";
 import type { CapturedSignature } from "./signature";
 
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Service documents · PDF générés + ancrage Bitcoin via OpenTimestamps     ║
-// ║                                                                          ║
-// ║ Chaque document = 1 ligne en base + 1 fichier dans Storage.              ║
-// ║ Chaînage : le hash du document N+1 inclut le hash du document N via      ║
-// ║ le champ hash_parent (preuve de provenance).                             ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+// ==========================================================================
+// Service documents (bipartite)
+//
+// Chaque document = 1 ligne en base + 1 fichier dans Storage.
+//
+// Cascade canonique bipartite (ordre FIGE) :
+//   acc = pdf_sha256
+//   +  vendeur_audio_sha256   (si present)
+//   +  vendeur_pubkey_hash    (si present)
+//   +  acheteur_audio_sha256  (si present)
+//   +  acheteur_pubkey_hash   (si present)
+//
+// C'est CE acc final qui est stocke dans documents.sha256 et qui est
+// ancre sur Bitcoin. Ordre FIGE = doit rester aligne sur
+// supabase/functions/anchor-document/index.ts::computeCascade.
+// ==========================================================================
 
 const TABLE = "documents";
 
-// ─── Lecture ────────────────────────────────────────────────────────────────
+// -------- Lecture -----------------------------------------------------------
 
 export async function getDocument(id: string): Promise<Document | null> {
   const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
@@ -37,8 +46,6 @@ export async function listDocumentsForDossier(dossierId: string): Promise<Docume
   return (data ?? []) as Document[];
 }
 
-// Recherche par empreinte SHA-256 · cœur de la vérification publique.
-// Renvoie le document qui possède exactement ce hash, ou null si introuvable.
 export async function findDocumentBySha256(sha256: string): Promise<Document | null> {
   const { data, error } = await supabase
     .from(TABLE)
@@ -49,7 +56,6 @@ export async function findDocumentBySha256(sha256: string): Promise<Document | n
   return data as Document | null;
 }
 
-// Renvoie le dernier document d'un type pour un dossier (utile pour chaînage).
 export async function getLatestDocument(
   dossierId: string,
   type?: DocumentType,
@@ -66,7 +72,7 @@ export async function getLatestDocument(
   return data as Document | null;
 }
 
-// ─── Écriture ───────────────────────────────────────────────────────────────
+// -------- Ecriture ----------------------------------------------------------
 
 export async function createDocument(input: DocumentInput): Promise<Document> {
   const { data, error } = await supabase.from(TABLE).insert(input).select("*").single();
@@ -74,30 +80,12 @@ export async function createDocument(input: DocumentInput): Promise<Document> {
   return data as Document;
 }
 
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Chaînage de hash · createChainedDocument                                 ║
-// ║                                                                          ║
-// ║ Insère un document en remplissant automatiquement hash_parent avec le    ║
-// ║ sha256 du document précédent du dossier (n'importe quel type, le plus    ║
-// ║ récent). Ça construit la chaîne de provenance que le dossier de cadrage  ║
-// ║ appelle "preuve d'antériorité chaînée" (section 7.1).                    ║
-// ║                                                                          ║
-// ║ Refuse si le document précédent n'est pas encore ancré (ots_proof_path   ║
-// ║ null) : chaîner sur un parent non-ancré crée une preuve faible.          ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+// -------- Bundle bipartite (PDF + audio v/a + signatures v/a) ---------------
 
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Création d'un document AVEC audio et/ou signature biométrique            ║
-// ║                                                                          ║
-// ║ Calcule le sha256 ancré sur Bitcoin en combinant le PDF, l'audio et      ║
-// ║ la pubkey de la signature WebAuthn (ce qui est présent).                 ║
-// ║                                                                          ║
-// ║ Règle du combined hash :                                                 ║
-// ║   sha256 ancré = combinedHash(pdf_sha256, audio_sha256 ?? "", sig_hash) ║
-// ║                                                                          ║
-// ║ Cette logique garantit qu'une seule altération sur l'un des 3 éléments   ║
-// ║ rend la preuve Bitcoin invalide.                                         ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+export type PartyCapture = {
+  audio?: UploadedAudio | null;
+  signature?: CapturedSignature | null;
+};
 
 export type CreateDocumentBundleInput = {
   dossier_id: string;
@@ -109,52 +97,58 @@ export type CreateDocumentBundleInput = {
   qr_code_url?: string | null;
   created_by?: string | null;
 
-  /** Audio uploadé via uploadAudio() · null si pas d'enregistrement vocal */
-  audio?: UploadedAudio | null;
-
-  /** Signature biométrique via captureSignature() · null si pas de Passkey */
-  signature?: CapturedSignature | null;
+  vendeur?: PartyCapture | null;
+  acheteur?: PartyCapture | null;
 };
 
+/**
+ * Cree un document en cascadant les hashs des 2 parties dans l'ordre canonique.
+ * Le hash resultant est ce qui sera ancre sur Bitcoin par anchor-document.
+ */
 export async function createDocumentBundle(
   input: CreateDocumentBundleInput,
 ): Promise<Document> {
-  const parts: string[] = [input.pdf_sha256];
-  if (input.audio?.sha256) parts.push(input.audio.sha256);
-  if (input.signature?.publicKeyHash) parts.push(input.signature.publicKeyHash);
+  const v = input.vendeur ?? null;
+  const a = input.acheteur ?? null;
 
-  const ancresha256 = parts.length === 1
-    ? input.pdf_sha256
-    : await combinedHashChain(parts);
+  const combinedSha256 = await combinedHashCascade({
+    pdf: input.pdf_sha256,
+    vendeurAudio: v?.audio?.sha256 ?? null,
+    vendeurSig: v?.signature?.publicKeyHash ?? null,
+    acheteurAudio: a?.audio?.sha256 ?? null,
+    acheteurSig: a?.signature?.publicKeyHash ?? null,
+  });
 
-  return createDocument({
+  const payload = {
     dossier_id: input.dossier_id,
     type: input.type,
     storage_bucket: input.storage_bucket,
     storage_path: input.storage_path,
-    sha256: ancresha256,
+    sha256: combinedSha256,
     pdf_sha256: input.pdf_sha256,
     hash_parent: input.hash_parent ?? null,
-    audio_storage_path: input.audio?.storagePath ?? null,
-    audio_sha256: input.audio?.sha256 ?? null,
-    signataire_pubkey_hash: input.signature?.publicKeyHash ?? null,
-    signataire_credential_id: input.signature?.credentialId ?? null,
-    signataire_pubkey_jwk: input.signature?.publicKeyJwk ?? null,
-    signataire_nom: input.signature?.signataireNom ?? null,
     qr_code_url: input.qr_code_url ?? null,
     created_by: input.created_by ?? null,
-  } as unknown as DocumentInput);
+
+    vendeur_audio_path: v?.audio?.storagePath ?? null,
+    vendeur_audio_sha256: v?.audio?.sha256 ?? null,
+    vendeur_pubkey_hash: v?.signature?.publicKeyHash ?? null,
+    vendeur_credential_id: v?.signature?.credentialId ?? null,
+    vendeur_pubkey_jwk: (v?.signature as unknown as { publicKeyJwk?: unknown })?.publicKeyJwk ?? null,
+    vendeur_signataire_nom: v?.signature?.signataireNom ?? null,
+
+    acheteur_audio_path: a?.audio?.storagePath ?? null,
+    acheteur_audio_sha256: a?.audio?.sha256 ?? null,
+    acheteur_pubkey_hash: a?.signature?.publicKeyHash ?? null,
+    acheteur_credential_id: a?.signature?.credentialId ?? null,
+    acheteur_pubkey_jwk: (a?.signature as unknown as { publicKeyJwk?: unknown })?.publicKeyJwk ?? null,
+    acheteur_signataire_nom: a?.signature?.signataireNom ?? null,
+  };
+
+  return createDocument(payload as unknown as DocumentInput);
 }
 
-// Combine N hashes en cascade (gauche à droite) via combinedHash.
-async function combinedHashChain(hashes: string[]): Promise<string> {
-  if (hashes.length === 0) throw new Error("combinedHashChain : liste vide");
-  let acc = hashes[0];
-  for (let i = 1; i < hashes.length; i++) {
-    acc = await combinedHash(acc, hashes[i]);
-  }
-  return acc;
-}
+// -------- Chainage vers le document precedent -------------------------------
 
 export type CreateChainedDocumentInput = Omit<DocumentInput, "hash_parent">;
 
@@ -165,8 +159,8 @@ export async function createChainedDocument(
 
   if (parent && !parent.ots_proof_path) {
     throw new Error(
-      `Impossible de chaîner sur un document parent non ancré (document ${parent.id}, status=${parent.ots_status}). ` +
-      `Attends que l'ancrage Bitcoin soit terminé avant de générer la suite.`,
+      `Impossible de chainer sur un document parent non ancre (document ${parent.id}, status=${parent.ots_status}). ` +
+      `Attends que l'ancrage Bitcoin soit termine avant de generer la suite.`,
     );
   }
 
@@ -176,8 +170,8 @@ export async function createChainedDocument(
   });
 }
 
-// Mise à jour du statut OTS · appelée par le cron upgrade-ots (palier B6)
-// ou par l'Edge Function anchor-document après confirmation.
+// -------- Update statut OTS -------------------------------------------------
+
 export type UpdateOtsStatusInput = {
   status: OtsStatus;
   otsProofPath?: string;
@@ -205,7 +199,6 @@ export async function updateOtsStatus(
   return data as Document;
 }
 
-// Liste des documents en attente d'ancrage Bitcoin · utilisé par le cron.
 export async function listPendingOts(limit = 50): Promise<Document[]> {
   const { data, error } = await supabase
     .from(TABLE)

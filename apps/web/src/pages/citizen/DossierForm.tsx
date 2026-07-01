@@ -2,18 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { CheckCircle2, Copy, FileText, Loader2, MessageCircle, Upload, X } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, Upload, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { PortalNav } from '@/components/PortalNav'
 import Stepper, { Step } from '@/components/Stepper'
 import { AudioRecorder } from '@/components/AudioRecorder'
-import { useAuth } from '@/auth/AuthProvider'
-import {
-    fetchDepartements,
-    fetchCommunes,
-    fetchArrondissements,
-    fetchQuartiers,
-    type TerritorialUnit,
-} from '../../services/teritorial'
+import { FingerprintCapture, type CapturedSignature } from '@/components/FingerprintCapture'
+import { supabase } from '@/lib/supabase'
+import { uploadCitizenAudio, uploadCitizenPiece } from '@/services/citizenCaptures'
 
 /* ------------------------------------------------------------------ *
  * Constants
@@ -84,9 +81,10 @@ const STEP_FIELDS: (keyof DossierValues)[][] = [
     ['departement', 'commune', 'arrondissement', 'quartier'],
     ['superficie_m2', 'zone', 'origine_droit'],
     ['voisin_nord', 'voisin_sud', 'voisin_est', 'voisin_ouest'],
-    [],
+    [], // documents (plan + pieces)
+    [], // consentements (audio + empreinte)
 ]
-const STEP_LABELS = ['Vendeur', 'Acheteur', 'Localisation', 'Parcelle', 'Voisinage', 'Documents']
+const STEP_LABELS = ['Vendeur', 'Acheteur', 'Localisation', 'Parcelle', 'Voisinage', 'Documents', 'Consentements']
 
 const inputCls =
     'w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-black outline-none transition ' +
@@ -101,46 +99,71 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 /* ------------------------------------------------------------------ *
  * Component
  * ------------------------------------------------------------------ */
+
+// Cle localStorage pour la persistance du brouillon (survit au refresh).
+// Les fichiers (plan + pieces) ne sont PAS persistes : les objets File ne sont
+// pas serializables et poser ce probleme depasse le scope du hackathon.
+const DRAFT_KEY = 'gandehou:dossier_form_draft'
+
+type Draft = { step: number; values: Partial<DossierValues> }
+
+function loadDraft(): Draft | null {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (typeof parsed?.step === 'number' && parsed?.values) return parsed as Draft
+        return null
+    } catch { return null }
+}
+
 export default function DossierForm() {
-    const { chef, role } = useAuth()
-    const isCQ = role === 'chef_quartier'
-
-    const [step, setStep] = useState(1)
-    const [submitted, setSubmitted] = useState<string | null>(null)
-
-    // Per-party ID document uploads
-    const [vendeurIdDoc, setVendeurIdDoc] = useState<File[]>([])
-    const [acheteurIdDoc, setAcheteurIdDoc] = useState<File[]>([])
-    // Plan + pièces
+    const initialDraft = loadDraft()
+    const [step, setStep] = useState(initialDraft?.step ?? 1)
+    const [submitted, setSubmitted] = useState<{ id: string; phone: string } | null>(null)
+    const [submitting, setSubmitting] = useState(false)
     const [plan, setPlan] = useState<File[]>([])
-    const [pieces, setPieces] = useState<File[]>([])
+    const [pieceVendeur, setPieceVendeur] = useState<File[]>([])
+    const [pieceAcheteur, setPieceAcheteur] = useState<File[]>([])
+    const [audioVendeur, setAudioVendeur] = useState<Blob | null>(null)
+    const [audioAcheteur, setAudioAcheteur] = useState<Blob | null>(null)
+    const [sigVendeur, setSigVendeur] = useState<CapturedSignature | null>(null)
+    const [sigAcheteur, setSigAcheteur] = useState<CapturedSignature | null>(null)
     const [docError, setDocError] = useState('')
-
-    // Per-party consent audio (spec: both seller and buyer record their voice)
-    const [vendeurAudio, setVendeurAudio] = useState<Blob | null>(null)
-    const [acheteurAudio, setAcheteurAudio] = useState<Blob | null>(null)
-
-    // Territorial cascading selects — track both the list data and selected IDs
-    const [departements, setDepartements] = useState<TerritorialUnit[]>([])
-    const [communes, setCommunes] = useState<TerritorialUnit[]>([])
-    const [arrondissements, setArrondissements] = useState<TerritorialUnit[]>([])
-    const [quartiers, setQuartiers] = useState<TerritorialUnit[]>([])
-    const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null)
-    const [selectedCommuneId, setSelectedCommuneId] = useState<number | null>(null)
-    const [selectedArrondId, setSelectedArrondId] = useState<number | null>(null)
-    const [loadingTerr, setLoadingTerr] = useState(false)
+    const [draftRestored, setDraftRestored] = useState(!!initialDraft)
 
     const {
-        register, trigger, getValues, watch, setValue,
+        register,
+        trigger,
+        getValues,
+        watch,
+        reset,
         formState: { errors },
     } = useForm<DossierValues>({
         resolver: zodResolver(schema),
         mode: 'onTouched',
-        defaultValues: {
-            vendeur_pi_type: 'carte_identite',
-            acheteur_pi_type: 'carte_identite',
-        },
+        defaultValues: (initialDraft?.values ?? {}) as Partial<DossierValues>,
     })
+
+    // Persistance auto-save : a chaque changement du formulaire, on ecrit le
+    // draft dans localStorage. Debounced via useEffect naturel (watch renvoie
+    // les valeurs a chaque rerender, on ecrit une fois par batch React).
+    const watchedAll = watch()
+    useEffect(() => {
+        if (submitted) return
+        try {
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, values: watchedAll }))
+        } catch { /* quota depasse · non-bloquant */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, JSON.stringify(watchedAll), submitted])
+
+    // Bouton "recommencer" · vide le draft et le formulaire
+    const discardDraft = () => {
+        try { localStorage.removeItem(DRAFT_KEY) } catch { /* prive */ }
+        reset({} as DossierValues)
+        setStep(1)
+        setDraftRestored(false)
+    }
 
     // Watch PI types for dynamic UI
     const vendeurPiType = watch('vendeur_pi_type')
@@ -211,24 +234,105 @@ export default function DossierForm() {
     const handleNext = async () => { if (await trigger(STEP_FIELDS[step - 1])) setStep((s) => s + 1) }
 
     const handleComplete = async () => {
-        if (vendeurIdDoc.length === 0) { setDocError("Ajoutez la pièce d'identité du vendeur."); return }
-        if (acheteurIdDoc.length === 0) { setDocError("Ajoutez la pièce d'identité de l'acheteur."); return }
-        if (plan.length === 0) { setDocError('Ajoutez le plan du géomètre.'); return }
-        if (pieces.length === 0) { setDocError('Ajoutez la photo du terrain.'); return }
-        const allFiles = [...vendeurIdDoc, ...acheteurIdDoc, ...plan, ...pieces]
-        const bad = allFiles.filter((f) => !ALLOWED_FILE_TYPES.includes(f.type))
-        if (bad.length > 0) { setDocError('Formats acceptés : JPEG, PNG, WebP, PDF.'); return }
-        const big = allFiles.filter((f) => f.size > MAX_FILE_SIZE)
-        if (big.length > 0) { setDocError('Taille maximale : 5 Mo par fichier.'); return }
+        // Etape 6 obligatoire : plan + 2 pieces d'identite (vendeur + acheteur)
+        if (plan.length === 0) return setDocError('Ajoutez le plan du géomètre.')
+        if (pieceVendeur.length === 0) return setDocError("Ajoutez la pièce d'identité du vendeur.")
+        if (pieceAcheteur.length === 0) return setDocError("Ajoutez la pièce d'identité de l'acheteur.")
+
         setDocError('')
 
-        // TODO(api): replace with createDossier + evaluerReglesAndf + estBloque
-        //   Then upload audio blobs:
-        //   if (vendeurAudio) await uploadAudio(dossier.id, 'vendeur', vendeurAudio)
-        //   if (acheteurAudio) await uploadAudio(dossier.id, 'acheteur', acheteurAudio)
-        //   Audio hashes are included in the combined hash for Bitcoin anchoring.
-        void getValues()
-        setSubmitted(`GDH-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`)
+        const v = getValues()
+        setSubmitting(true)
+
+        const detectIdType = (val: string): 'cip' | 'passeport' =>
+            /^\d{13}$/.test(val.trim()) ? 'cip' : 'passeport'
+        const vendeurIdType = detectIdType(v.vendeur_cip)
+        const acheteurIdType = detectIdType(v.acheteur_cip)
+
+        // Genere l'UUID cote client pour pouvoir uploader AVANT d'inserer.
+        const dossierId = crypto.randomUUID()
+
+        try {
+            // 1. Upload en parallele des pieces d'identite (bucket prive)
+            const [vp, ap] = await Promise.all([
+                uploadCitizenPiece(dossierId, 'vendeur', pieceVendeur[0]),
+                uploadCitizenPiece(dossierId, 'acheteur', pieceAcheteur[0]),
+            ])
+
+            // 2. Upload en parallele des audios (facultatifs)
+            const [va, aa] = await Promise.all([
+                audioVendeur ? uploadCitizenAudio(dossierId, 'vendeur', audioVendeur) : Promise.resolve(null),
+                audioAcheteur ? uploadCitizenAudio(dossierId, 'acheteur', audioAcheteur) : Promise.resolve(null),
+            ])
+
+            // 3. INSERT dossier avec tous les paths / hashes
+            const { data, error } = await supabase
+                .from('dossiers')
+                .insert({
+                    id: dossierId,
+                    statut: 'soumis',
+                    vendeur_nom: v.vendeur_nom,
+                    vendeur_id_type: vendeurIdType,
+                    vendeur_id_value: v.vendeur_cip,
+                    vendeur_phone: v.vendeur_phone,
+                    acheteur_nom: v.acheteur_nom,
+                    acheteur_id_type: acheteurIdType,
+                    acheteur_id_value: v.acheteur_cip,
+                    acheteur_phone: v.acheteur_phone,
+                    acheteur_nationalite: v.acheteur_nationalite,
+                    departement: v.departement,
+                    commune: v.commune,
+                    arrondissement: v.arrondissement,
+                    quartier: v.quartier,
+                    superficie_m2: v.superficie_m2,
+                    zone: v.zone,
+                    origine_droit: v.origine_droit,
+                    voisin_nord: v.voisin_nord,
+                    voisin_sud: v.voisin_sud,
+                    voisin_est: v.voisin_est,
+                    voisin_ouest: v.voisin_ouest,
+                    // Captures citoyen · seront copiees dans documents au moment CQ
+                    vendeur_piece_id_path: vp.path,
+                    vendeur_piece_id_sha256: vp.sha256,
+                    vendeur_piece_id_mime: vp.mime,
+                    acheteur_piece_id_path: ap.path,
+                    acheteur_piece_id_sha256: ap.sha256,
+                    acheteur_piece_id_mime: ap.mime,
+                    vendeur_audio_path: va?.path ?? null,
+                    vendeur_audio_sha256: va?.sha256 ?? null,
+                    acheteur_audio_path: aa?.path ?? null,
+                    acheteur_audio_sha256: aa?.sha256 ?? null,
+                    vendeur_pubkey_hash: sigVendeur?.publicKeyHash ?? null,
+                    vendeur_credential_id: sigVendeur?.credentialId ?? null,
+                    vendeur_signataire_nom: sigVendeur?.signataireNom ?? null,
+                    acheteur_pubkey_hash: sigAcheteur?.publicKeyHash ?? null,
+                    acheteur_credential_id: sigAcheteur?.credentialId ?? null,
+                    acheteur_signataire_nom: sigAcheteur?.signataireNom ?? null,
+                })
+                .select('id')
+                .single()
+
+            if (error || !data) {
+                toast.error(error?.message ?? 'Impossible de soumettre le dossier.')
+                return
+            }
+
+            // Notifie le CQ concerne (best-effort, non-bloquant).
+            supabase.functions.invoke('notify-cq-new-dossier', {
+                body: { dossierId: data.id },
+            }).catch(() => { /* silencieux, l'admin verra via le dashboard */ })
+
+            // Sauvegarde le telephone localement pour la page de suivi.
+            try { localStorage.setItem('gandehou:citizen_phone', v.vendeur_phone) } catch { /* privee */ }
+            // Efface le brouillon persiste
+            try { localStorage.removeItem(DRAFT_KEY) } catch { /* prive */ }
+
+            setSubmitted({ id: data.id, phone: v.vendeur_phone })
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Erreur reseau.')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     return (
@@ -241,11 +345,28 @@ export default function DossierForm() {
                 ) : (
                     <>
                         <h1 className="mb-2 text-center text-3xl font-semibold xl:text-5xl">Initier un dossier</h1>
-                        <p className="mx-auto mb-10 max-w-xl text-center text-neutral-900/60 dark:text-white/60">
-                            {isCQ
-                                ? 'Créez un dossier depuis votre espace Chef de Quartier.'
-                                : 'Préparez votre dossier depuis votre téléphone. Aucun compte requis.'}
+                        <p className="mx-auto mb-6 max-w-xl text-center text-neutral-900/60 dark:text-white/60">
+                            Préparez votre dossier depuis votre téléphone. Vos informations restent locales
+                            jusqu'à l'envoi.
                         </p>
+
+                        {draftRestored && (
+                            <div
+                                role="status"
+                                className="mx-auto mb-8 flex max-w-xl flex-col gap-2 rounded-2xl border border-gandehou-green/30 bg-gandehou-green/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <span className="text-neutral-900/80 dark:text-white/80">
+                                    Brouillon restauré · vous continuez à l'étape {step}.
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={discardDraft}
+                                    className="shrink-0 text-xs font-medium text-gandehou-green underline outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-gandehou-green"
+                                >
+                                    Recommencer à zéro
+                                </button>
+                            </div>
+                        )}
 
                         <Stepper
                             currentStep={step}
@@ -475,15 +596,84 @@ export default function DossierForm() {
                                 </fieldset>
                             </Step>
 
-                            {/* ── Step 6: Documents ────────────────────────────────── */}
+                            {/* 6 — Documents (plan + photos pieces d'identite par partie) */}
                             <Step>
                                 <div className="space-y-5">
                                     <h2 className="text-xl font-semibold">Pièces justificatives</h2>
                                     <p className="text-sm text-neutral-900/60 dark:text-white/60">
-                                        JPEG, PNG, WebP ou PDF · 5 Mo max par fichier.
+                                        Chaque partie doit fournir la photo de sa pièce d'identité (visage visible).
+                                        Formats : JPEG, PNG, WebP, HEIC, PDF · 5 Mo max.
                                     </p>
-                                    <FilePick id="plan" label="Plan du géomètre" hint="Photo ou PDF — obligatoire" accept=".jpg,.jpeg,.png,.webp,.pdf" files={plan} onFiles={setPlan} required />
-                                    <FilePick id="terrain" label="Photo du terrain" hint="Photo du terrain — obligatoire" accept=".jpg,.jpeg,.png,.webp" files={pieces} onFiles={setPieces} required />
+                                    <FilePick
+                                        id="plan"
+                                        label="Plan du géomètre"
+                                        hint="Photo ou PDF — obligatoire"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={plan}
+                                        onFiles={setPlan}
+                                    />
+                                    <FilePick
+                                        id="piece_vendeur"
+                                        label="Pièce d'identité du vendeur"
+                                        hint="Photo de la CIP ou du passeport (visage visible)"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={pieceVendeur}
+                                        onFiles={setPieceVendeur}
+                                    />
+                                    <FilePick
+                                        id="piece_acheteur"
+                                        label="Pièce d'identité de l'acheteur"
+                                        hint="Photo de la CIP ou du passeport (visage visible)"
+                                        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf"
+                                        files={pieceAcheteur}
+                                        onFiles={setPieceAcheteur}
+                                    />
+                                    {docError && <p className="text-sm text-gandehou-red" role="alert">{docError}</p>}
+                                </div>
+                            </Step>
+
+                            {/* 7 — Consentements (audio + empreinte par partie) */}
+                            <Step>
+                                <div className="space-y-6">
+                                    <div>
+                                        <h2 className="text-xl font-semibold">Consentement des parties</h2>
+                                        <p className="mt-1 text-sm text-neutral-900/60 dark:text-white/60">
+                                            Chaque partie enregistre un court message vocal (10-30 secondes)
+                                            confirmant la transaction, puis appose son empreinte biométrique.
+                                            Le tout est ancré sur Bitcoin avec le PDF.
+                                        </p>
+                                    </div>
+
+                                    <fieldset className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                                        <legend className="px-2 text-sm font-semibold text-gandehou-green">
+                                            Vendeur · {watch('vendeur_nom') || 'nom non renseigné'}
+                                        </legend>
+                                        <div className="space-y-4">
+                                            <AudioRecorder onRecorded={setAudioVendeur} />
+                                            <FingerprintCapture
+                                                signataireNom={watch('vendeur_nom') || 'Vendeur'}
+                                                onCaptured={setSigVendeur}
+                                            />
+                                        </div>
+                                    </fieldset>
+
+                                    <fieldset className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                                        <legend className="px-2 text-sm font-semibold text-gandehou-green">
+                                            Acheteur · {watch('acheteur_nom') || 'nom non renseigné'}
+                                        </legend>
+                                        <div className="space-y-4">
+                                            <AudioRecorder onRecorded={setAudioAcheteur} />
+                                            <FingerprintCapture
+                                                signataireNom={watch('acheteur_nom') || 'Acheteur'}
+                                                onCaptured={setSigAcheteur}
+                                            />
+                                        </div>
+                                    </fieldset>
+
+                                    <p className="text-xs text-neutral-900/50 dark:text-white/50">
+                                        Les consentements audio et biométrique sont recommandés mais restent facultatifs si votre appareil ne les prend pas en charge.
+                                    </p>
+
                                     {docError && <p className="text-sm text-gandehou-red" role="alert">{docError}</p>}
                                 </div>
                             </Step>
@@ -552,8 +742,23 @@ function Field({ label, error, htmlFor, children }: { label: string; error?: str
 function FilePick({ id, label, hint, accept, multiple = false, required = false, files, onFiles }: { id: string; label: string; hint: string; accept: string; multiple?: boolean; required?: boolean; files: File[]; onFiles: (files: File[]) => void }) {
     const inputRef = useRef<HTMLInputElement>(null)
     const handleFiles = (incoming: File[]) => {
-        const valid = incoming.filter((f) => ALLOWED_FILE_TYPES.includes(f.type) && f.size <= MAX_FILE_SIZE)
+        // Sur mobile iOS/Android, certains fichiers arrivent sans MIME (chaine vide).
+        // On accepte aussi via l'extension du nom pour ne pas les filtrer a tort.
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']
+        const allowedExt = /\.(jpe?g|png|webp|heic|heif|pdf)$/i
+        const maxSize = 10 * 1024 * 1024
+        const valid = incoming.filter((f) => {
+            const typeOk = f.type ? allowedTypes.includes(f.type) : allowedExt.test(f.name)
+            return typeOk && f.size > 0 && f.size <= maxSize
+        })
         onFiles(multiple ? [...files, ...valid] : valid.slice(0, 1))
+    }
+
+    // Affichage lisible : octets < Ko < Mo. Evite le "0.0 Mo" pour les petits fichiers.
+    const formatSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} o`
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`
+        return `${(bytes / 1024 / 1024).toFixed(1)} Mo`
     }
 
     return (
@@ -574,7 +779,9 @@ function FilePick({ id, label, hint, accept, multiple = false, required = false,
                         <li key={`${f.name}-${i}`} className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3 py-2 text-sm dark:bg-white/[0.05]">
                             <FileText className="h-4 w-4 shrink-0 text-black/50 dark:text-white/50" />
                             <span className="truncate">{f.name}</span>
-                            <span className="shrink-0 text-xs text-neutral-900/40 dark:text-white/40">{(f.size / 1024 / 1024).toFixed(1)} Mo</span>
+                            <span className="shrink-0 text-xs text-neutral-900/40 dark:text-white/40">
+                                {formatSize(f.size)}
+                            </span>
                             <button type="button" aria-label={`Retirer ${f.name}`} onClick={() => onFiles(files.filter((_, idx) => idx !== i))} className="ml-auto rounded-md p-1 text-black/40 outline-none transition-colors hover:text-gandehou-red focus-visible:ring-2 focus-visible:ring-gandehou-red dark:text-white/40">
                                 <X className="h-4 w-4" />
                             </button>
@@ -586,30 +793,26 @@ function FilePick({ id, label, hint, accept, multiple = false, required = false,
     )
 }
 
-function DossierSuccess({ num }: { num: string }) {
-    const [copied, setCopied] = useState(false)
-    const link = `${window.location.origin}/verifier/${num}`
-    const message = `Bonjour, voici mon dossier foncier Gandehou n° ${num}. Lien : ${link}`
-    const waHref = `https://wa.me/?text=${encodeURIComponent(message)}`
-    const copy = async () => {
-        try { await navigator.clipboard.writeText(num); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { }
-    }
+function DossierSuccess({ id: _id, phone }: { id: string; phone: string }) {
     return (
         <div className="mx-auto max-w-md text-center">
-            <CheckCircle2 className="mx-auto h-16 w-16 text-gandehou-green" />
-            <h1 className="mt-6 text-3xl font-semibold">Dossier créé</h1>
-            <p className="mt-2 text-neutral-900/60 dark:text-white/60">Transmettez ce numéro à votre Chef de Quartier.</p>
-            <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl border border-black/10 bg-gandehou-green/10 px-5 py-4 dark:border-white/10">
-                <span className="text-xl font-bold tracking-wide text-gandehou-green">{num}</span>
-                <button type="button" onClick={copy} aria-label="Copier" className="rounded-lg p-2 text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/10 focus-visible:ring-4 focus-visible:ring-gandehou-green/30">
-                    <Copy className="h-5 w-5" />
-                </button>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gandehou-yellow/20">
+                <Clock className="h-8 w-8 text-amber-600 dark:text-gandehou-yellow" />
             </div>
-            {copied && <p className="mt-2 text-sm text-gandehou-green">Numéro copié</p>}
-            <a href={waHref} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40">
-                <MessageCircle className="h-6 w-6" />
-                Partager par WhatsApp
-            </a>
+            <h1 className="mt-6 text-3xl font-semibold">Dossier soumis</h1>
+            <p className="mt-2 text-neutral-900/60 dark:text-white/60">
+                Votre dossier est en attente d'attestation par votre Chef de Quartier.
+                Vous serez notifié dès qu'il aura été validé.
+            </p>
+
+            <Link
+                to={`/citizen-portal?phone=${encodeURIComponent(phone)}`}
+                className="mt-10 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
+            >
+                <CheckCircle2 className="h-6 w-6" />
+                Voir mes dossiers
+            </Link>
+
             <p className="mt-6 text-xs leading-relaxed text-neutral-900/50 dark:text-white/50">
                 Document provisoire — sans valeur de titre de propriété.
             </p>

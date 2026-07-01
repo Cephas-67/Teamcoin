@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import {
-    ArrowLeft, CheckCircle2, Download, Loader2, MessageCircle,
+    ArrowLeft, Bitcoin, CheckCircle2, Download, Loader2, MessageCircle,
     ShieldCheck,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -25,6 +25,8 @@ import { StatusChip } from '@/components/StatusChip'
 import { supabase } from '@/lib/supabase'
 import { STORAGE_BUCKETS } from '@/lib/types'
 import { generateAttestationPdf } from '@/lib/attestationPdf'
+import { anchorDocument } from '@/services/anchor'
+import { combinedHashCascade } from '@gandehou/ledger'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '@/public/logo.svg'
 import { cn } from '@/lib/cn'
@@ -32,9 +34,22 @@ import { cn } from '@/lib/cn'
 type Dossier = {
     id: string
     statut: 'brouillon' | 'soumis' | 'atteste_cq' | 'valide_mairie' | 'litige'
-    vendeur_nom: string; vendeur_cip: string | null; vendeur_phone: string | null
-    acheteur_nom: string; acheteur_cip: string | null; acheteur_phone: string | null
+    vendeur_nom: string
+    vendeur_id_type: 'cip' | 'passeport' | null
+    vendeur_id_value: string | null
+    vendeur_phone: string | null
+    // Captures citoyen · copiees dans documents a l'attestation
+    vendeur_audio_path: string | null; vendeur_audio_sha256: string | null
+    vendeur_pubkey_hash: string | null; vendeur_credential_id: string | null; vendeur_signataire_nom: string | null
+    vendeur_piece_id_path: string | null; vendeur_piece_id_sha256: string | null
+    acheteur_nom: string
+    acheteur_id_type: 'cip' | 'passeport' | null
+    acheteur_id_value: string | null
+    acheteur_phone: string | null
     acheteur_nationalite: string | null
+    acheteur_audio_path: string | null; acheteur_audio_sha256: string | null
+    acheteur_pubkey_hash: string | null; acheteur_credential_id: string | null; acheteur_signataire_nom: string | null
+    acheteur_piece_id_path: string | null; acheteur_piece_id_sha256: string | null
     departement: string | null; commune: string | null
     arrondissement: string | null; quartier: string | null
     superficie_m2: number | null
@@ -67,6 +82,9 @@ export default function DossierReview() {
     const [pdfFilename, setPdfFilename] = useState('')
     const [pdfPublicUrl, setPdfPublicUrl] = useState('')
     const [generatingPdf, setGeneratingPdf] = useState(false)
+    const [anchoring, setAnchoring] = useState(false)
+    const [anchorHash, setAnchorHash] = useState('')
+    const [anchorError, setAnchorError] = useState('')
 
     useEffect(() => {
         if (!id) return
@@ -125,16 +143,63 @@ export default function DossierReview() {
                     .getPublicUrl(path)
                 setPdfPublicUrl(pub.publicUrl)
 
-                await supabase.from('documents').upsert({
-                    dossier_id: d.id,
-                    type: 'attestation_provisoire',
-                    storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
-                    storage_path: path,
-                    sha256,
-                    pdf_sha256: sha256,
-                    ots_status: 'pending',
-                    qr_code_url: link,
-                }, { onConflict: 'dossier_id,type' })
+                // Cascade bipartite : le combined hash inclut les captures citoyen
+                // deja stockees sur le dossier au moment de la soumission.
+                const combinedSha256 = await combinedHashCascade({
+                    pdf: sha256,
+                    vendeurAudio: d.vendeur_audio_sha256,
+                    vendeurSig: d.vendeur_pubkey_hash,
+                    acheteurAudio: d.acheteur_audio_sha256,
+                    acheteurSig: d.acheteur_pubkey_hash,
+                })
+
+                // Upsert de la ligne documents (retourne l'id pour l'ancrage).
+                // On copie les captures citoyen depuis le dossier ; anchor-document
+                // recalculera la meme cascade cote serveur pour valider.
+                const { data: docRow, error: docErr } = await supabase
+                    .from('documents')
+                    .upsert({
+                        dossier_id: d.id,
+                        type: 'attestation_provisoire',
+                        storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+                        storage_path: path,
+                        sha256: combinedSha256,
+                        pdf_sha256: sha256,
+                        ots_status: 'pending',
+                        qr_code_url: link,
+                        vendeur_audio_path: d.vendeur_audio_path,
+                        vendeur_audio_sha256: d.vendeur_audio_sha256,
+                        vendeur_pubkey_hash: d.vendeur_pubkey_hash,
+                        vendeur_credential_id: d.vendeur_credential_id,
+                        vendeur_signataire_nom: d.vendeur_signataire_nom,
+                        acheteur_audio_path: d.acheteur_audio_path,
+                        acheteur_audio_sha256: d.acheteur_audio_sha256,
+                        acheteur_pubkey_hash: d.acheteur_pubkey_hash,
+                        acheteur_credential_id: d.acheteur_credential_id,
+                        acheteur_signataire_nom: d.acheteur_signataire_nom,
+                    }, { onConflict: 'dossier_id,type' })
+                    .select('id')
+                    .single()
+
+                setGeneratingPdf(false)
+
+                // Declenchement de l'ancrage OpenTimestamps (best-effort)
+                if (!docErr && docRow?.id) {
+                    setAnchoring(true)
+                    try {
+                        const result = await anchorDocument(docRow.id)
+                        if (result.ok) {
+                            setAnchorHash('hash' in result ? result.hash : '')
+                        } else {
+                            setAnchorError(result.error ?? 'Ancrage refuse')
+                        }
+                    } catch (e) {
+                        setAnchorError(e instanceof Error ? e.message : 'Erreur reseau')
+                    } finally {
+                        setAnchoring(false)
+                    }
+                }
+                return
             } else {
                 console.warn('[Gandehou] Upload PDF echoue — telechargement local seul.', upErr.message)
             }
@@ -236,6 +301,39 @@ export default function DossierReview() {
                         </p>
                     </div>
 
+                    {/* ── Etat de l'ancrage OpenTimestamps ─────────────────── */}
+                    <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 text-left dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-900/60 dark:text-white/60">
+                            <Bitcoin className="h-3.5 w-3.5" /> Ancrage Bitcoin
+                        </div>
+                        {anchoring && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-neutral-900/70 dark:text-white/70">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Soumission au calendrier OpenTimestamps…
+                            </div>
+                        )}
+                        {!anchoring && anchorHash && (
+                            <div className="mt-2 space-y-1">
+                                <p className="text-sm text-gandehou-green">
+                                    ✓ Preuve soumise. Confirmation Bitcoin dans quelques heures.
+                                </p>
+                                <p className="break-all font-mono text-[10px] text-neutral-900/45 dark:text-white/45">
+                                    {anchorHash}
+                                </p>
+                            </div>
+                        )}
+                        {!anchoring && anchorError && (
+                            <p className="mt-2 text-sm text-gandehou-red">
+                                Ancrage échoué : {anchorError}
+                            </p>
+                        )}
+                        {!anchoring && !anchorHash && !anchorError && !generatingPdf && (
+                            <p className="mt-2 text-sm text-neutral-900/50 dark:text-white/50">
+                                En attente de la génération du PDF…
+                            </p>
+                        )}
+                    </div>
+
                     <button
                         type="button"
                         onClick={handleWhatsApp}
@@ -286,14 +384,24 @@ export default function DossierReview() {
                 <div className="space-y-4">
                     <Section title="Vendeur">
                         <Row label="Noms et prénoms" value={dossier.vendeur_nom} />
-                        {dossier.vendeur_cip && <Row label="CIP / Passeport" value={dossier.vendeur_cip} />}
+                        {dossier.vendeur_id_value && (
+                            <Row
+                                label={dossier.vendeur_id_type === 'passeport' ? 'Passeport' : 'CIP'}
+                                value={dossier.vendeur_id_value}
+                            />
+                        )}
                         {dossier.vendeur_phone && <Row label="Téléphone" value={dossier.vendeur_phone} />}
                     </Section>
 
                     <Section title="Acheteur">
                         <Row label="Noms et prénoms" value={dossier.acheteur_nom} />
                         {dossier.acheteur_nationalite && <Row label="Nationalité" value={dossier.acheteur_nationalite} />}
-                        {dossier.acheteur_cip && <Row label="CIP / Passeport" value={dossier.acheteur_cip} />}
+                        {dossier.acheteur_id_value && (
+                            <Row
+                                label={dossier.acheteur_id_type === 'passeport' ? 'Passeport' : 'CIP'}
+                                value={dossier.acheteur_id_value}
+                            />
+                        )}
                         {dossier.acheteur_phone && <Row label="Téléphone" value={dossier.acheteur_phone} />}
                     </Section>
 

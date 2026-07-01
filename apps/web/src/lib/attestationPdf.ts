@@ -196,9 +196,13 @@ export async function generateAttestationPdf(
 
   // ── Parties ───────────────────────────────────────────────────────────
   drawSection(page, helvBold, "Parties", margin, y); y -= 22;
-  // Support des deux noms de colonne (avant/apres migration bipartite)
-  const vendeurId = dossier.vendeur_id_value ?? (dossier as unknown as { vendeur_cip?: string | null }).vendeur_cip ?? null;
-  const acheteurId = dossier.acheteur_id_value ?? (dossier as unknown as { acheteur_cip?: string | null }).acheteur_cip ?? null;
+  // Support des deux noms de colonne cote type (types.ts asymetrique) ET cote DB.
+  const dAny = dossier as unknown as {
+    vendeur_id_value?: string | null; vendeur_cip?: string | null;
+    acheteur_id_value?: string | null; acheteur_cip?: string | null;
+  };
+  const vendeurId = dAny.vendeur_id_value ?? dAny.vendeur_cip ?? null;
+  const acheteurId = dAny.acheteur_id_value ?? dAny.acheteur_cip ?? null;
   drawField(
     page, helv, helvBold, "Vendeur",
     joinNonEmpty([dossier.vendeur_nom, vendeurId, dossier.vendeur_phone], " · "),

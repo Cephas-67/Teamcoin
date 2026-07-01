@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, LogOut, MapPin, RefreshCw } from 'lucide-react'
+import { Bitcoin, FileText, MapPin, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { StatusChip } from '@/components/StatusChip'
 import { useAuth } from '@/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { triggerUpgradeNow } from '@/services/anchor'
 import logo from '../../public/logo.svg'
 import { LogoutModal } from '@/components/LogoutModal'
 
@@ -28,6 +30,34 @@ export default function CqDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [cqQuartier, setCqQuartier] = useState<string | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+
+  const handleUpgradeOts = async () => {
+    setUpgrading(true)
+    try {
+      const res = await triggerUpgradeNow()
+      if (res.ok && res.stats) {
+        const { scanned, upgraded, stillPending, errors } = res.stats
+        if (upgraded > 0) {
+          toast.success(`${upgraded}/${scanned} preuves confirmées sur Bitcoin.`)
+          load()
+        } else if (scanned === 0) {
+          toast.info('Aucune preuve en attente.')
+        } else {
+          toast.info(`${stillPending}/${scanned} encore en attente Bitcoin. Reessaie plus tard.`)
+        }
+        if (errors && errors.length > 0) {
+          console.warn('[upgrade-ots] erreurs', errors)
+        }
+      } else {
+        toast.error(res.error ?? 'Vérification échouée.')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erreur réseau')
+    } finally {
+      setUpgrading(false)
+    }
+  }
 
   const load = async () => {
     if (!chef) return
@@ -107,15 +137,27 @@ export default function CqDashboard() {
           <span className="text-sm font-medium text-neutral-900/60 dark:text-white/60">
             {loading ? '…' : `${dossiers.length} dossier${dossiers.length !== 1 ? 's' : ''}`}
           </span>
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-neutral-900/60 outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green disabled:opacity-40 dark:text-white/60 dark:hover:bg-white/10"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualiser
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleUpgradeOts}
+              disabled={upgrading}
+              className="flex items-center gap-1.5 rounded-xl border border-black/10 px-3 py-1.5 text-sm font-medium text-neutral-900/70 outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green disabled:opacity-40 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/10"
+              title="Force le passage pending → confirmed pour les preuves déjà minées"
+            >
+              <Bitcoin className={`h-4 w-4 ${upgrading ? 'animate-spin' : ''}`} />
+              {upgrading ? 'Vérification…' : 'Vérifier Bitcoin'}
+            </button>
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-neutral-900/60 outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green disabled:opacity-40 dark:text-white/60 dark:hover:bg-white/10"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Actualiser
+            </button>
+          </div>
         </div>
 
         {/* ── Error ───────────────────────────────────────────────── */}

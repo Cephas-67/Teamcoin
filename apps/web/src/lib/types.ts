@@ -55,13 +55,13 @@ export type Dossier = {
   // Vendeur
   vendeur_nom: string;
   vendeur_id_type: IdType | null;
-  vendeur_id_value: string | null;   // ex-vendeur_cip (CIP ou n° passeport)
+  vendeur_cip: string | null;        // Contenu générique : CIP ou n° passeport, discriminé par vendeur_id_type
   vendeur_phone: string | null;
 
   // Acheteur
   acheteur_nom: string;
   acheteur_id_type: IdType | null;
-  acheteur_id_value: string | null;  // ex-acheteur_cip (CIP ou n° passeport)
+  acheteur_cip: string | null;       // Contenu générique : CIP ou n° passeport, discriminé par acheteur_id_type
   acheteur_phone: string | null;
   acheteur_nationalite: string | null;  // "beninoise" ou "etrangere" (dérivé de id_type par défaut)
 

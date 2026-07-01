@@ -2,17 +2,20 @@ import { sha256OfFile } from "@gandehou/ledger";
 import { supabase } from "../lib/supabase";
 import { STORAGE_BUCKETS } from "../lib/types";
 
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Service audio · enregistrement vocal du consentement                     ║
-// ║                                                                          ║
-// ║ Cas d'usage Béninois : Maman Chantal illettrée enregistre 10s en Fon     ║
-// ║ ("Je, Chantal, achète la parcelle ABC..."). L'audio est uploadé puis     ║
-// ║ son hash combiné avec celui du PDF est ancré sur Bitcoin.                ║
-// ║                                                                          ║
-// ║ La vérification publique pourra rejouer l'audio + comparer le hash.      ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+// ==========================================================================
+// Service audio · enregistrement vocal du consentement (bipartite)
+//
+// Chaque partie (vendeur + acheteur) enregistre son propre audio de
+// consentement. Le hash de chaque audio entre dans le combined hash ancre
+// sur Bitcoin (cascade canonique : cf. packages/ledger::combinedHashCascade).
+//
+// Convention de path : <dossierId>/<documentId>/<party>-consentement.<ext>
+// ==========================================================================
+
+export type Party = "vendeur" | "acheteur";
 
 export type UploadedAudio = {
+  party: Party;
   storagePath: string;
   sha256: string;
   publicUrl: string;
@@ -20,18 +23,17 @@ export type UploadedAudio = {
 };
 
 /**
- * Uploade un enregistrement audio (Blob webm/ogg/wav) dans le bucket dédié,
- * calcule son SHA-256, et renvoie les infos à attacher au document.
- *
- * Convention de path : <dossierId>/<documentId>/consentement.<ext>
+ * Uploade un enregistrement audio pour une partie donnee.
+ * Retourne les infos a passer a createDocumentBundle.
  */
 export async function uploadAudio(
   dossierId: string,
   documentId: string,
+  party: Party,
   audioBlob: Blob,
 ): Promise<UploadedAudio> {
   const ext = blobExtension(audioBlob);
-  const storagePath = `${dossierId}/${documentId}/consentement.${ext}`;
+  const storagePath = `${dossierId}/${documentId}/${party}-consentement.${ext}`;
 
   const sha256 = await sha256OfFile(audioBlob);
 
@@ -41,11 +43,12 @@ export async function uploadAudio(
       contentType: audioBlob.type || "audio/webm",
       upsert: true,
     });
-  if (error) throw new Error(`uploadAudio : ${error.message}`);
+  if (error) throw new Error(`uploadAudio(${party}) : ${error.message}`);
 
   const { data } = supabase.storage.from(STORAGE_BUCKETS.AUDIO).getPublicUrl(storagePath);
 
   return {
+    party,
     storagePath,
     sha256,
     publicUrl: data.publicUrl,
@@ -54,7 +57,7 @@ export async function uploadAudio(
 }
 
 /**
- * Télécharge un audio depuis Storage (pour le lecteur audio du verifier).
+ * Telecharge un audio depuis Storage (pour le lecteur audio du verifier).
  */
 export async function downloadAudio(storagePath: string): Promise<Blob> {
   const { data, error } = await supabase.storage

@@ -1,29 +1,24 @@
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Edge Function · verify-proof                                             ║
-// ║                                                                          ║
-// ║ Vérification cryptographique RÉELLE d'un document Gandehou.              ║
-// ║                                                                          ║
-// ║ La différence avec services/verify.ts (frontend) :                       ║
-// ║   • verify.ts compare juste un hash en base (vulnérable si BD compromise)║
-// ║   • verify-proof télécharge la preuve .ots et la vérifie contre les      ║
-// ║     calendriers OpenTimestamps + Bitcoin (indépendant de la BD)          ║
-// ║                                                                          ║
-// ║ C'est CE niveau de vérification que le jury Bitcoin attend.              ║
-// ║                                                                          ║
-// ║ Contrat d'entrée :                                                       ║
-// ║   POST { documentId: string }                       (mode A · UUID)      ║
-// ║   POST { sha256: string }                           (mode B · hash brut) ║
-// ║                                                                          ║
-// ║ Contrat de sortie :                                                      ║
-// ║   200 { ok: true, verdict: "confirmed", blockHeight, bitcoinTimestamp }  ║
-// ║   200 { ok: true, verdict: "pending", ... }                              ║
-// ║   200 { ok: true, verdict: "mismatch", ... }                             ║
-// ║   200 { ok: true, verdict: "invalid", ... }                              ║
-// ║   404 { ok: false, error }                                               ║
-// ║                                                                          ║
-// ║ Effet de bord : si verdict === "mismatch", met à jour ots_status en base ║
-// ║ pour propager le drapeau rouge dans tout le système.                     ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+// ============================================================================
+// Edge Function · verify-proof (bipartite)
+//
+// Verification cryptographique REELLE d'un document Gandehou :
+//   1. Recupere la ligne documents (colonnes bipartites)
+//   2. Telecharge le PDF + la preuve .ots
+//   3. Recalcule le hash PDF, verifie qu'il matche pdf_sha256 en base
+//   4. Pour chaque piece bipartite presente (audio vendeur/acheteur) :
+//      telecharge, recalcule le hash, verifie match
+//   5. Recalcule le combined hash cascade et le verifie contre la .ots
+//   6. Renvoie verdict : confirmed | pending | mismatch | invalid
+//
+// Aligne sur anchor-document::computeCascade et
+// packages/ledger::combinedHashCascade.
+//
+// Contrat :
+//   POST { documentId: string }     (mode A · UUID)
+//   POST { sha256: string }         (mode B · hash brut du fichier depose)
+//
+// Effet de bord : si verdict === mismatch, met a jour ots_status en base.
+// ============================================================================
 
 import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
@@ -32,14 +27,22 @@ import { sha256OfBytes, verifyProof } from "../_shared/ots.ts";
 const OTS_BUCKET = "ots-proofs";
 const AUDIO_BUCKET = "documents-audio";
 
-async function computeCombinedHash(
-  pdfHash: string,
-  audioHash: string | null,
-  sigHash: string | null,
-): Promise<string> {
-  let acc = pdfHash.toLowerCase();
+async function computeCascade(input: {
+  pdf: string;
+  vendeurAudio: string | null;
+  vendeurSig: string | null;
+  acheteurAudio: string | null;
+  acheteurSig: string | null;
+}): Promise<string> {
   const enc = new TextEncoder();
-  for (const h of [audioHash, sigHash]) {
+  let acc = input.pdf.toLowerCase();
+  const ordered = [
+    input.vendeurAudio,
+    input.vendeurSig,
+    input.acheteurAudio,
+    input.acheteurSig,
+  ];
+  for (const h of ordered) {
     if (!h) continue;
     const bytes = enc.encode(`${acc}::${h.toLowerCase()}`);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -49,6 +52,14 @@ async function computeCombinedHash(
   }
   return acc;
 }
+
+const COLS = `
+  id, dossier_id, storage_bucket, storage_path,
+  sha256, pdf_sha256,
+  vendeur_audio_path, vendeur_audio_sha256, vendeur_pubkey_hash,
+  acheteur_audio_path, acheteur_audio_sha256, acheteur_pubkey_hash,
+  ots_proof_path
+`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
@@ -70,23 +81,16 @@ Deno.serve(async (req) => {
 
     const supabase = getAdminClient();
 
-    // ─── Récupération du document à vérifier ────────────────────────────────
-    const COLS = "id, dossier_id, storage_bucket, storage_path, sha256, pdf_sha256, audio_storage_path, audio_sha256, signataire_pubkey_hash, ots_proof_path";
+    // 1. Recuperation du document
     let doc: any;
     if (documentId) {
       const { data, error } = await supabase
-        .from("documents")
-        .select(COLS)
-        .eq("id", documentId)
-        .maybeSingle();
+        .from("documents").select(COLS).eq("id", documentId).maybeSingle();
       if (error) throw new Error(`Lecture document : ${error.message}`);
       doc = data;
     } else {
       const { data, error } = await supabase
-        .from("documents")
-        .select(COLS)
-        .eq("sha256", sha256Input!.toLowerCase())
-        .maybeSingle();
+        .from("documents").select(COLS).eq("sha256", sha256Input!.toLowerCase()).maybeSingle();
       if (error) throw new Error(`Lecture document par hash : ${error.message}`);
       doc = data;
     }
@@ -95,7 +99,7 @@ Deno.serve(async (req) => {
       return jsonResponse({
         ok: true,
         verdict: "invalid",
-        reason: "Aucun document Gandehou ne correspond. Le fichier n'a jamais été ancré ou a été modifié.",
+        reason: "Aucun document Gandehou ne correspond. Le fichier n'a jamais ete ancre ou a ete modifie.",
       });
     }
 
@@ -103,11 +107,11 @@ Deno.serve(async (req) => {
       return jsonResponse({
         ok: true,
         verdict: "invalid",
-        reason: `Document ${doc.id} jamais ancré (ots_proof_path null).`,
+        reason: `Document ${doc.id} jamais ancre (ots_proof_path null).`,
       });
     }
 
-    // ─── Téléchargement parallèle PDF + preuve .ots ─────────────────────────
+    // 2. Telechargement parallele PDF + preuve .ots
     const [pdfDl, otsDl] = await Promise.all([
       supabase.storage.from(doc.storage_bucket).download(doc.storage_path),
       supabase.storage.from(OTS_BUCKET).download(doc.ots_proof_path),
@@ -120,9 +124,8 @@ Deno.serve(async (req) => {
       throw new Error(`Download .ots (${OTS_BUCKET}/${doc.ots_proof_path}) : ${otsDl.error?.message ?? "blob vide"}`);
     }
 
-    // ─── Recalcul SHA-256 du PDF actuel ─────────────────────────────────────
-    const pdfBytes = await pdfDl.data.arrayBuffer();
-    const pdfHashActuel = await sha256OfBytes(pdfBytes);
+    // 3. Verification du hash PDF
+    const pdfHashActuel = await sha256OfBytes(await pdfDl.data.arrayBuffer());
     const pdfHashAttendu = (doc.pdf_sha256 ?? doc.sha256).toLowerCase();
 
     if (pdfHashActuel !== pdfHashAttendu) {
@@ -130,55 +133,56 @@ Deno.serve(async (req) => {
       return jsonResponse({
         ok: true,
         verdict: "mismatch",
-        reason: "Le PDF en Storage a été altéré depuis l'ancrage.",
+        reason: "Le PDF en Storage a ete altere depuis l'ancrage.",
         expectedPdfHash: pdfHashAttendu,
         actualPdfHash: pdfHashActuel,
       });
     }
 
-    // ─── Si audio attaché : recalcul + vérification ─────────────────────────
-    let audioHashActuel: string | null = null;
-    if (doc.audio_storage_path) {
+    // 4. Verification bipartite des audios (si presents)
+    for (const [party, path, expected] of [
+      ["vendeur", doc.vendeur_audio_path, doc.vendeur_audio_sha256],
+      ["acheteur", doc.acheteur_audio_path, doc.acheteur_audio_sha256],
+    ] as const) {
+      if (!path) continue;
       const { data: audioBlob, error: audioErr } = await supabase.storage
-        .from(AUDIO_BUCKET)
-        .download(doc.audio_storage_path);
+        .from(AUDIO_BUCKET).download(path);
       if (audioErr || !audioBlob) {
         return jsonResponse({
           ok: true,
           verdict: "mismatch",
-          reason: `Audio attendu introuvable (${doc.audio_storage_path}).`,
+          reason: `Audio ${party} attendu introuvable (${path}).`,
+          party,
         });
       }
-      audioHashActuel = await sha256OfBytes(await audioBlob.arrayBuffer());
-      if (audioHashActuel !== (doc.audio_sha256 ?? "").toLowerCase()) {
+      const actual = await sha256OfBytes(await audioBlob.arrayBuffer());
+      if (actual !== (expected ?? "").toLowerCase()) {
         await supabase.from("documents").update({ ots_status: "mismatch" }).eq("id", doc.id);
         return jsonResponse({
           ok: true,
           verdict: "mismatch",
-          reason: "L'audio en Storage a été altéré depuis l'ancrage.",
-          expectedAudioHash: doc.audio_sha256,
-          actualAudioHash: audioHashActuel,
+          reason: `L'audio ${party} en Storage a ete altere depuis l'ancrage.`,
+          party,
+          expectedAudioHash: expected,
+          actualAudioHash: actual,
         });
       }
     }
 
-    // ─── Recalculer le combined hash (ce qui a été ANCRÉ sur Bitcoin) ───────
-    const combinedActuel = await computeCombinedHash(
-      pdfHashActuel,
-      audioHashActuel,
-      doc.signataire_pubkey_hash ?? null,
-    );
+    // 5. Recalcul du combined hash cascade et verification crypto
+    const combinedActuel = await computeCascade({
+      pdf: pdfHashActuel,
+      vendeurAudio: doc.vendeur_audio_sha256 ?? null,
+      vendeurSig: doc.vendeur_pubkey_hash ?? null,
+      acheteurAudio: doc.acheteur_audio_sha256 ?? null,
+      acheteurSig: doc.acheteur_pubkey_hash ?? null,
+    });
 
-    // ─── Vérification crypto réelle contre la preuve OTS ────────────────────
     const otsBytes = new Uint8Array(await otsDl.data.arrayBuffer());
     const result = await verifyProof(otsBytes, combinedActuel);
 
-    // ─── Propagation du verdict en base si mismatch ─────────────────────────
     if (result.verdict === "mismatch") {
-      await supabase
-        .from("documents")
-        .update({ ots_status: "mismatch" })
-        .eq("id", doc.id);
+      await supabase.from("documents").update({ ots_status: "mismatch" }).eq("id", doc.id);
     }
 
     return jsonResponse({
@@ -187,10 +191,10 @@ Deno.serve(async (req) => {
       dossierId: doc.dossier_id,
       hash: combinedActuel,
       pdfHash: pdfHashActuel,
-      audioHash: audioHashActuel,
-      signatureHash: doc.signataire_pubkey_hash ?? null,
-      hasAudio: !!doc.audio_storage_path,
-      hasSignature: !!doc.signataire_pubkey_hash,
+      hasVendeurAudio: !!doc.vendeur_audio_path,
+      hasAcheteurAudio: !!doc.acheteur_audio_path,
+      hasVendeurSig: !!doc.vendeur_pubkey_hash,
+      hasAcheteurSig: !!doc.acheteur_pubkey_hash,
       ...result,
     });
   } catch (err) {
