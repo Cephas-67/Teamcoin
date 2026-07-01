@@ -92,9 +92,8 @@ export default function DossierReview() {
     const [pdfFilename, setPdfFilename] = useState('')
     const [pdfPublicUrl, setPdfPublicUrl] = useState('')
     const [generatingPdf, setGeneratingPdf] = useState(false)
-    const [anchoring, setAnchoring] = useState(false)
-    const [anchorHash, setAnchorHash] = useState('')
-    const [anchorError, setAnchorError] = useState('')
+    // Ancrage OTS · silencieux en arriere-plan, on n'affiche plus rien a l'ecran
+    const [, setAnchorHash] = useState('')
 
     useEffect(() => {
         if (!id) return
@@ -188,83 +187,71 @@ export default function DossierReview() {
                 cqSignerId: chef?.id,
                 verifyUrl: link,
             })
+            // Affichage instantane : blob pret → iframe visible immediatement.
             setPdfBlob(blob)
             setPdfFilename(filename)
+            setGeneratingPdf(false)
 
+            // Fire-and-forget : upload Storage + upsert documents + ancrage en
+            // arriere-plan. L'utilisateur voit deja son PDF pendant ce temps.
             const path = `${d.id}/${filename}`
-            const { error: upErr } = await supabase.storage
-                .from(STORAGE_BUCKETS.PROVISOIRES)
-                .upload(path, blob, { contentType: 'application/pdf', upsert: true })
+            ;(async () => {
+                try {
+                    const { error: upErr } = await supabase.storage
+                        .from(STORAGE_BUCKETS.PROVISOIRES)
+                        .upload(path, blob, { contentType: 'application/pdf', upsert: true })
+                    if (upErr) return console.warn('[Gandehou] Upload PDF echoue', upErr.message)
 
-            if (!upErr) {
-                const { data: pub } = supabase.storage
-                    .from(STORAGE_BUCKETS.PROVISOIRES)
-                    .getPublicUrl(path)
-                setPdfPublicUrl(pub.publicUrl)
+                    const { data: pub } = supabase.storage
+                        .from(STORAGE_BUCKETS.PROVISOIRES)
+                        .getPublicUrl(path)
+                    setPdfPublicUrl(pub.publicUrl)
 
-                // Cascade bipartite : le combined hash inclut les captures citoyen
-                // deja stockees sur le dossier au moment de la soumission.
-                const combinedSha256 = await combinedHashCascade({
-                    pdf: sha256,
-                    vendeurAudio: d.vendeur_audio_sha256,
-                    vendeurSig: d.vendeur_pubkey_hash,
-                    acheteurAudio: d.acheteur_audio_sha256,
-                    acheteurSig: d.acheteur_pubkey_hash,
-                })
+                    const combinedSha256 = await combinedHashCascade({
+                        pdf: sha256,
+                        vendeurAudio: d.vendeur_audio_sha256,
+                        vendeurSig: d.vendeur_pubkey_hash,
+                        acheteurAudio: d.acheteur_audio_sha256,
+                        acheteurSig: d.acheteur_pubkey_hash,
+                    })
 
-                // Upsert de la ligne documents (retourne l'id pour l'ancrage).
-                // On copie les captures citoyen depuis le dossier ; anchor-document
-                // recalculera la meme cascade cote serveur pour valider.
-                const { data: docRow, error: docErr } = await supabase
-                    .from('documents')
-                    .upsert({
-                        dossier_id: d.id,
-                        type: 'attestation_provisoire',
-                        storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
-                        storage_path: path,
-                        sha256: combinedSha256,
-                        pdf_sha256: sha256,
-                        ots_status: 'pending',
-                        qr_code_url: link,
-                        vendeur_audio_path: d.vendeur_audio_path,
-                        vendeur_audio_sha256: d.vendeur_audio_sha256,
-                        vendeur_pubkey_hash: d.vendeur_pubkey_hash,
-                        vendeur_credential_id: d.vendeur_credential_id,
-                        vendeur_signataire_nom: d.vendeur_signataire_nom,
-                        acheteur_audio_path: d.acheteur_audio_path,
-                        acheteur_audio_sha256: d.acheteur_audio_sha256,
-                        acheteur_pubkey_hash: d.acheteur_pubkey_hash,
-                        acheteur_credential_id: d.acheteur_credential_id,
-                        acheteur_signataire_nom: d.acheteur_signataire_nom,
-                    }, { onConflict: 'dossier_id,type' })
-                    .select('id')
-                    .single()
+                    const { data: docRow, error: docErr } = await supabase
+                        .from('documents')
+                        .upsert({
+                            dossier_id: d.id,
+                            type: 'attestation_provisoire',
+                            storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+                            storage_path: path,
+                            sha256: combinedSha256,
+                            pdf_sha256: sha256,
+                            ots_status: 'pending',
+                            qr_code_url: link,
+                            vendeur_audio_path: d.vendeur_audio_path,
+                            vendeur_audio_sha256: d.vendeur_audio_sha256,
+                            vendeur_pubkey_hash: d.vendeur_pubkey_hash,
+                            vendeur_credential_id: d.vendeur_credential_id,
+                            vendeur_signataire_nom: d.vendeur_signataire_nom,
+                            acheteur_audio_path: d.acheteur_audio_path,
+                            acheteur_audio_sha256: d.acheteur_audio_sha256,
+                            acheteur_pubkey_hash: d.acheteur_pubkey_hash,
+                            acheteur_credential_id: d.acheteur_credential_id,
+                            acheteur_signataire_nom: d.acheteur_signataire_nom,
+                        }, { onConflict: 'dossier_id,type' })
+                        .select('id')
+                        .single()
 
-                setGeneratingPdf(false)
-
-                // Declenchement de l'ancrage OpenTimestamps (best-effort)
-                if (!docErr && docRow?.id) {
-                    setAnchoring(true)
-                    try {
-                        const result = await anchorDocument(docRow.id)
-                        if (result.ok) {
-                            setAnchorHash('hash' in result ? result.hash : '')
-                        } else {
-                            setAnchorError(result.error ?? 'Ancrage refuse')
-                        }
-                    } catch (e) {
-                        setAnchorError(e instanceof Error ? e.message : 'Erreur reseau')
-                    } finally {
-                        setAnchoring(false)
+                    if (!docErr && docRow?.id) {
+                        try {
+                            const result = await anchorDocument(docRow.id)
+                            if (result.ok && 'hash' in result) setAnchorHash(result.hash)
+                        } catch { /* ancrage silencieux · retentable via dashboard */ }
                     }
+                } catch (e) {
+                    console.warn('[Gandehou] Persistance en arriere-plan echouee', e)
                 }
-                return
-            } else {
-                console.warn('[Gandehou] Upload PDF echoue — telechargement local seul.', upErr.message)
-            }
+            })()
         } catch (e) {
             console.error('[Gandehou] Generation PDF echouee', e)
-        } finally {
             setGeneratingPdf(false)
         }
     }
