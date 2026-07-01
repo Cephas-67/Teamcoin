@@ -6,7 +6,7 @@ import {
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { BackButton } from '@/components/BackButton'
 import { PhoneInput } from '@/components/PhoneInput'
-import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo } from '@/services/auth'
+import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo, type SignupRole } from '@/services/auth'
 import { countries, formatPhone } from '@/data/countries'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '../public/logo.svg'
@@ -26,7 +26,14 @@ export default function Connexion() {
   const navigate = useNavigate()
   const location = useLocation()
   const { refresh } = useAuth()
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+  const state = location.state as { from?: string; role?: string } | null
+  const redirectTo = state?.from ?? '/dashboard'
+  // Role transmis depuis /onboarding ('chef-quartier' | 'agent').
+  // On le mappe vers les valeurs du schema (profiles.role check constraint).
+  const roleFromOnboarding: SignupRole | undefined =
+    state?.role === 'chef-quartier' ? 'chef_quartier'
+    : state?.role === 'agent' ? 'agent_mairie'
+    : undefined
 
   const [method, setMethod] = useState<Method>('email')
   const [step, setStep] = useState<Step>('input')
@@ -56,7 +63,7 @@ export default function Connexion() {
     if (!email.trim() || !email.includes('@')) return setError('Entre une adresse email valide.')
     setLoading(true)
     try {
-      await sendEmailOtp(email.trim().toLowerCase())
+      await sendEmailOtp(email.trim().toLowerCase(), roleFromOnboarding)
       setStep('otp')
       setCountdown(60)
     } catch (e) {
@@ -64,7 +71,7 @@ export default function Connexion() {
     } finally {
       setLoading(false)
     }
-  }, [email])
+  }, [email, roleFromOnboarding])
 
   const handleVerifyEmail = useCallback(async () => {
     if (otp.length < 6) return setError('Entre le code à 6 chiffres.')

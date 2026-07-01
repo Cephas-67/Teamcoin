@@ -4,11 +4,16 @@ import type { User } from "@supabase/supabase-js";
 export type AuthUser = User;
 
 // ─── Auth Email · Supabase (réel) ───────────────────────────────────────────
-export async function sendEmailOtp(email: string): Promise<void> {
+// Le role est passe dans data (metadata) et sera lu par le trigger SQL
+// handle_new_user pour creer un profil avec le bon role au premier signup.
+export type SignupRole = "chef_quartier" | "agent_mairie" | "admin";
+
+export async function sendEmailOtp(email: string, role?: SignupRole): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: true,
+      data: role ? { role } : undefined,
       emailRedirectTo: typeof window !== "undefined"
         ? `${window.location.origin}/dashboard`
         : undefined,
