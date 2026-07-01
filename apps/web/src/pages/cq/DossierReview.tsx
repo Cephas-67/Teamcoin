@@ -336,7 +336,9 @@ export default function DossierReview() {
 
         const downloadPart = pdfPublicUrl ? `\nTelecharger : ${pdfPublicUrl}` : ''
         const waMsg = `${introTxt}${downloadPart}\nVerifier en ligne : ${shareLink}`
-        window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener,noreferrer')
+        // WA_TARGET : numéro de démo. Format international sans '+' ni espaces.
+        const WA_TARGET = '2290147799236'
+        window.open(`https://wa.me/${WA_TARGET}?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener,noreferrer')
     }
 
     if (loading) return <FullPageLoader />

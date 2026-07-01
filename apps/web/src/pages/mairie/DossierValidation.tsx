@@ -212,7 +212,7 @@ export default function DossierValidation() {
           </div>
 
           <a
-            href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`}
+            href={`https://wa.me/2290147799236?text=${encodeURIComponent(waMsg)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"

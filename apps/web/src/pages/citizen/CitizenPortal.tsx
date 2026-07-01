@@ -74,22 +74,28 @@ export default function CitizenPortal() {
   const [dossiers, setDossiers] = useState<DossierRow[] | null>(null)
   const [error, setError] = useState('')
 
-  const cleanPhone = (p: string) => p.replace(/\s+/g, '')
+  // Format canonique en DB : +229{10 digits} (Bénin 01 XX XX XX XX)
+  const normalizePhone = (p: string): string => {
+    const digits = p.replace(/\D+/g, '')
+    if (digits.startsWith('229') && digits.length === 13) return `+${digits}`
+    if (digits.length === 10 && digits.startsWith('0')) return `+229${digits}`
+    return p.startsWith('+') ? p : digits
+  }
 
   const lookup = async (p: string) => {
-    const clean = cleanPhone(p)
-    if (clean.length < 8) return
+    const full = normalizePhone(p)
+    if (!/^\+2290\d{9}$/.test(full)) return
     setSearching(true)
     setError('')
     const { data, error: err } = await supabase
       .from('dossiers')
       .select('id,statut,vendeur_nom,acheteur_nom,quartier,commune,superficie_m2,created_at')
-      .or(`vendeur_phone.eq.${clean},acheteur_phone.eq.${clean}`)
+      .or(`vendeur_phone.eq.${full},acheteur_phone.eq.${full}`)
       .order('created_at', { ascending: false })
     if (err) setError(err.message)
     else setDossiers((data ?? []) as DossierRow[])
     setSearching(false)
-    try { localStorage.setItem('gandehou:citizen_phone', clean) } catch { /* prive */ }
+    try { localStorage.setItem('gandehou:citizen_phone', full) } catch { /* prive */ }
   }
 
   useEffect(() => {
@@ -144,17 +150,21 @@ export default function CitizenPortal() {
             className="mt-5 flex flex-col gap-3 sm:flex-row"
             onSubmit={(e) => { e.preventDefault(); lookup(phone) }}
           >
-            <input
-              type="tel"
-              inputMode="tel"
-              placeholder="ex : 97000000 ou +22997000000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="flex-1 rounded-xl border border-black/10 bg-white px-4 py-3 text-black outline-none transition focus-visible:border-gandehou-green focus-visible:ring-4 focus-visible:ring-gandehou-green/20 dark:border-white/15 dark:bg-white/5 dark:text-white"
-            />
+            <div className="flex flex-1 overflow-hidden rounded-xl border border-black/10 focus-within:border-gandehou-green focus-within:ring-4 focus-within:ring-gandehou-green/20 dark:border-white/15">
+              <span className="flex items-center bg-black/5 px-3 text-sm font-medium text-neutral-900/70 dark:bg-white/10 dark:text-white/70">+229</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="01 47 79 92 36"
+                value={phone.replace(/^\+229/, '').replace(/\D+/g, '').slice(0, 10)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D+/g, '').slice(0, 10))}
+                className="w-full bg-white px-3 py-3 text-black outline-none dark:bg-white/5 dark:text-white"
+              />
+            </div>
             <button
               type="submit"
-              disabled={searching || cleanPhone(phone).length < 8}
+              disabled={searching || phone.replace(/\D+/g, '').length !== 10}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gandehou-green px-5 py-3 font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-50"
             >
               <Search className="h-4 w-4" />

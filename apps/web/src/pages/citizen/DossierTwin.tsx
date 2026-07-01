@@ -67,6 +67,8 @@ type DocumentRow = {
   hash_parent: string | null
   ots_status: OtsStatus
   qr_code_url: string | null
+  storage_bucket: string | null
+  storage_path: string | null
   created_at: string
 }
 
@@ -138,10 +140,11 @@ const VERDICT: Record<VerdictKey, {
 }
 
 function resolveVerdict(dossier: Dossier, latestDoc: DocumentRow | null): VerdictKey {
-  if (!latestDoc) return 'brouillon'
-  if (latestDoc.ots_status === 'mismatch') return 'mismatch'
-  if (latestDoc.ots_status === 'confirmed') return 'confirmed'
-  // pending — distinguish by dossier statut
+  // Le statut du dossier prime : si le CQ a valide (atteste_cq), on affiche
+  // le verdict provisional_cq meme si la ligne documents n'existe pas encore
+  // (upsert asynchrone ou en erreur).
+  if (latestDoc?.ots_status === 'mismatch') return 'mismatch'
+  if (latestDoc?.ots_status === 'confirmed') return 'confirmed'
   if (dossier.statut === 'valide_mairie') return 'provisional_mairie'
   if (dossier.statut === 'atteste_cq') return 'provisional_cq'
   return 'brouillon'
@@ -365,6 +368,24 @@ export default function DossierTwin() {
             )}
           </Section>
         </div>
+
+        {/* ── Bouton de telechargement de l'attestation PDF (si emise) ── */}
+        {latestDoc?.storage_bucket && latestDoc?.storage_path && dossier.statut === 'atteste_cq' && (() => {
+          const { data } = supabase.storage
+            .from(latestDoc.storage_bucket)
+            .getPublicUrl(latestDoc.storage_path)
+          return (
+            <a
+              href={data.publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
+            >
+              <ExternalLink className="h-5 w-5" />
+              Voir mon attestation PDF
+            </a>
+          )
+        })()}
 
         {/* ── QR code (canonical link to this page, for printing) ── */}
         {qrDataUrl && (

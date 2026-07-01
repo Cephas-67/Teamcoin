@@ -20,12 +20,12 @@ import { uploadCitizenAudio, uploadCitizenPiece, uploadCitizenPlan } from '@/ser
 const NPI_REGEX = /^\d{13}$/
 // Passeport : 6–9 caractères alphanumériques (norme OACI).
 const PASSPORT_REGEX = /^[A-Z0-9]{6,9}$/i
-// V1 Bénin · exactement 8 chiffres locaux, prefixe +229 ajoute automatiquement.
-const PHONE_REGEX = /^\d{8}$/
+// V1 Bénin · 10 chiffres commençant par 0 (format 01 XX XX XX XX), +229 auto.
+const PHONE_REGEX = /^0\d{9}$/
 const phoneSchema = z
     .string()
     .min(1, 'Numéro requis.')
-    .refine((v) => PHONE_REGEX.test(v.replace(/\s+/g, '')), 'Numéro invalide (8 chiffres, ex : 97 00 00 00).')
+    .refine((v) => PHONE_REGEX.test(v.replace(/\s+/g, '')), 'Numéro invalide (10 chiffres, ex : 01 47 79 92 36).')
     .transform((v) => `+229${v.replace(/\s+/g, '')}`)
 // Accepte NPI OU passeport — le champ est "CIP ou passeport".
 const pieceSchema = z
@@ -382,10 +382,10 @@ export default function DossierForm() {
                                     <Field label="Téléphone (WhatsApp)" error={errors.vendeur_phone?.message} htmlFor="vendeur_phone">
                                         <div className="flex overflow-hidden rounded-xl border border-black/10 focus-within:border-gandehou-green focus-within:ring-4 focus-within:ring-gandehou-green/20 dark:border-white/15">
                                             <span className="flex items-center bg-black/5 px-3 text-sm font-medium text-neutral-900/70 dark:bg-white/10 dark:text-white/70">+229</span>
-                                            <input id="vendeur_phone" type="tel" inputMode="numeric" maxLength={8}
+                                            <input id="vendeur_phone" type="tel" inputMode="numeric" maxLength={10}
                                                 className="w-full bg-white px-3 py-3 text-black outline-none dark:bg-white/5 dark:text-white"
                                                 aria-invalid={!!errors.vendeur_phone}
-                                                placeholder="97 00 00 00" {...register('vendeur_phone')} />
+                                                placeholder="01 47 79 92 36" {...register('vendeur_phone')} />
                                         </div>
                                     </Field>
                                 </fieldset>
@@ -410,10 +410,10 @@ export default function DossierForm() {
                                     <Field label="Téléphone (WhatsApp)" error={errors.acheteur_phone?.message} htmlFor="acheteur_phone">
                                         <div className="flex overflow-hidden rounded-xl border border-black/10 focus-within:border-gandehou-green focus-within:ring-4 focus-within:ring-gandehou-green/20 dark:border-white/15">
                                             <span className="flex items-center bg-black/5 px-3 text-sm font-medium text-neutral-900/70 dark:bg-white/10 dark:text-white/70">+229</span>
-                                            <input id="acheteur_phone" type="tel" inputMode="numeric" maxLength={8}
+                                            <input id="acheteur_phone" type="tel" inputMode="numeric" maxLength={10}
                                                 className="w-full bg-white px-3 py-3 text-black outline-none dark:bg-white/5 dark:text-white"
                                                 aria-invalid={!!errors.acheteur_phone}
-                                                placeholder="97 00 00 00" {...register('acheteur_phone')} />
+                                                placeholder="01 47 79 92 36" {...register('acheteur_phone')} />
                                         </div>
                                     </Field>
                                 </fieldset>
