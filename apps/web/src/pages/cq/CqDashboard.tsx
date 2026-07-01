@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bitcoin, FileText, MapPin, RefreshCw } from 'lucide-react'
+import { ShieldCheck, FileText, MapPin, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { StatusChip } from '@/components/StatusChip'
@@ -39,12 +39,12 @@ export default function CqDashboard() {
       if (res.ok && res.stats) {
         const { scanned, upgraded, stillPending, errors } = res.stats
         if (upgraded > 0) {
-          toast.success(`${upgraded}/${scanned} preuves confirmées sur Bitcoin.`)
+          toast.success(`${upgraded}/${scanned} preuves confirmées.`)
           load()
         } else if (scanned === 0) {
           toast.info('Aucune preuve en attente.')
         } else {
-          toast.info(`${stillPending}/${scanned} encore en attente Bitcoin. Reessaie plus tard.`)
+          toast.info(`${stillPending}/${scanned} encore en attente d'ancrage. Reessaie plus tard.`)
         }
         if (errors && errors.length > 0) {
           console.warn('[upgrade-ots] erreurs', errors)
@@ -145,8 +145,8 @@ export default function CqDashboard() {
               className="flex items-center gap-1.5 rounded-xl border border-black/10 px-3 py-1.5 text-sm font-medium text-neutral-900/70 outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green disabled:opacity-40 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/10"
               title="Force le passage pending → confirmed pour les preuves déjà minées"
             >
-              <Bitcoin className={`h-4 w-4 ${upgrading ? 'animate-spin' : ''}`} />
-              {upgrading ? 'Vérification…' : 'Vérifier Bitcoin'}
+              <ShieldCheck className={`h-4 w-4 ${upgrading ? 'animate-spin' : ''}`} />
+              {upgrading ? 'Vérification…' : 'Vérifier ancrage'}
             </button>
             <button
               type="button"
@@ -193,7 +193,6 @@ export default function CqDashboard() {
                       {d.id.slice(0, 8).toUpperCase()}
                     </span>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {d.isNew && <StatusChip status="nouveau" label="Nouveau" />}
                       <StatusChip status={d.statut === 'soumis' ? 'soumis' : 'brouillon'} />
                     </div>
                   </div>
@@ -214,9 +213,10 @@ export default function CqDashboard() {
                     {d.superficie_m2 && (
                       <span>{d.superficie_m2.toLocaleString('fr-FR')} m²</span>
                     )}
-                    <span className="ml-auto">
-                      {new Date(d.created_at).toLocaleDateString('fr-FR', {
-                        day: 'numeric', month: 'short',
+                    <span className="ml-auto tabular-nums">
+                      {new Date(d.created_at).toLocaleString('fr-FR', {
+                        day: '2-digit', month: 'short',
+                        hour: '2-digit', minute: '2-digit',
                       })}
                     </span>
                   </div>

@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import {
-    ArrowLeft, Bitcoin, CheckCircle2, Download, Loader2, MessageCircle,
+    ArrowLeft, CheckCircle2, Download, Loader2, MessageCircle,
     ShieldCheck,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -75,6 +75,12 @@ export default function DossierReview() {
     const [attesting, setAttesting] = useState(false)
     const [attestError, setAttestError] = useState('')
 
+    // URLs pour l'affichage des captures citoyen (photos pieces + audios)
+    const [vendeurPieceUrl, setVendeurPieceUrl] = useState('')
+    const [acheteurPieceUrl, setAcheteurPieceUrl] = useState('')
+    const [vendeurAudioUrl, setVendeurAudioUrl] = useState('')
+    const [acheteurAudioUrl, setAcheteurAudioUrl] = useState('')
+
     // Attestation state (post-signature)
     const [qrDataUrl, setQrDataUrl] = useState('')
     const [attestationNum, setAttestationNum] = useState('')
@@ -96,10 +102,45 @@ export default function DossierReview() {
                 }
                 const d = data as Dossier
                 setDossier(d)
+                loadCaptureUrls(d)
                 if (d.statut === 'atteste_cq') buildAttestation(d)
                 setLoading(false)
             })
     }, [id])
+
+    // Recupere les URLs signees (bucket prive) et publiques pour affichage
+    const loadCaptureUrls = async (d: Dossier) => {
+        const dAny = d as unknown as {
+            vendeur_piece_id_path?: string | null
+            acheteur_piece_id_path?: string | null
+            vendeur_audio_path?: string | null
+            acheteur_audio_path?: string | null
+        }
+        if (dAny.vendeur_piece_id_path) {
+            const { data } = await supabase.storage
+                .from('pieces-identite')
+                .createSignedUrl(dAny.vendeur_piece_id_path, 300)
+            if (data?.signedUrl) setVendeurPieceUrl(data.signedUrl)
+        }
+        if (dAny.acheteur_piece_id_path) {
+            const { data } = await supabase.storage
+                .from('pieces-identite')
+                .createSignedUrl(dAny.acheteur_piece_id_path, 300)
+            if (data?.signedUrl) setAcheteurPieceUrl(data.signedUrl)
+        }
+        if (dAny.vendeur_audio_path) {
+            const { data } = supabase.storage
+                .from('documents-audio')
+                .getPublicUrl(dAny.vendeur_audio_path)
+            setVendeurAudioUrl(data.publicUrl)
+        }
+        if (dAny.acheteur_audio_path) {
+            const { data } = supabase.storage
+                .from('documents-audio')
+                .getPublicUrl(dAny.acheteur_audio_path)
+            setAcheteurAudioUrl(data.publicUrl)
+        }
+    }
 
     // Charge le profil du CQ (pour le libelle signataire dans le PDF)
     const [cqProfile, setCqProfile] = useState<{ full_name: string | null; email: string | null } | null>(null)
@@ -263,76 +304,40 @@ export default function DossierReview() {
 
     // ── Ecran d'attestation emise ────────────────────────────────────
     if (flowStep === 'confirmed') {
+        const pdfPreviewUrl = pdfBlob ? URL.createObjectURL(pdfBlob) : ''
         return (
             <div className="min-h-screen bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
                 <PageHeader backTo="/cq/dashboard" />
-                <main className="mx-auto max-w-sm px-6 pb-20 pt-8 text-center">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gandehou-green/15">
-                        <CheckCircle2 className="h-8 w-8 text-gandehou-green" />
-                    </div>
-                    <h1 className="mt-5 text-2xl font-semibold">Attestation émise</h1>
-                    <p className="mt-2 text-sm text-neutral-900/60 dark:text-white/60">
-                        L'attestation de comparution et de non-litige de voisinage a été signée.
-                    </p>
-
-                    <div className="mt-8 rounded-2xl border border-gandehou-green/30 bg-gandehou-green/10 p-6">
-                        <div className="flex items-center justify-center gap-2 text-sm font-medium text-gandehou-green">
+                <main className="mx-auto max-w-2xl px-4 pb-20 pt-8">
+                    <div className="text-center">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gandehou-green/15">
+                            <CheckCircle2 className="h-8 w-8 text-gandehou-green" />
+                        </div>
+                        <h1 className="mt-5 text-2xl font-semibold">Attestation émise</h1>
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-gandehou-green/10 px-4 py-1.5 text-sm font-medium text-gandehou-green">
                             <ShieldCheck className="h-4 w-4" />{attestationNum}
                         </div>
-                        <StatusChip status="atteste_cq" className="mx-auto mt-3" />
-
-                        {generatingPdf && (
-                            <div className="mt-5 flex items-center justify-center gap-2 text-sm text-neutral-900/60 dark:text-white/60">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Génération du PDF…
-                            </div>
-                        )}
-
-                        {qrDataUrl && !generatingPdf ? (
-                            <img src={qrDataUrl} alt="QR code" className="mx-auto mt-5 h-[140px] w-[140px] rounded-xl" />
-                        ) : !generatingPdf ? (
-                            <div className="mx-auto mt-5 flex h-[140px] w-[140px] items-center justify-center rounded-xl bg-black/5 text-xs dark:bg-white/5">
-                                QR indisponible
-                            </div>
-                        ) : null}
-
-                        <p className="mt-3 text-xs text-neutral-900/50 dark:text-white/50">
-                            Document provisoire — sans valeur de titre de propriété.
-                        </p>
                     </div>
 
-                    {/* ── Etat de l'ancrage OpenTimestamps ─────────────────── */}
-                    <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 text-left dark:border-white/10 dark:bg-white/[0.03]">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-900/60 dark:text-white/60">
-                            <Bitcoin className="h-3.5 w-3.5" /> Ancrage Bitcoin
-                        </div>
-                        {anchoring && (
-                            <div className="mt-2 flex items-center gap-2 text-sm text-neutral-900/70 dark:text-white/70">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Soumission au calendrier OpenTimestamps…
+                    {/* Apercu PDF direct · le QR est deja integre dans le doc */}
+                    <div className="mt-6 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm dark:border-white/10">
+                        {generatingPdf || !pdfPreviewUrl ? (
+                            <div className="flex h-[500px] items-center justify-center gap-2 text-sm text-neutral-900/60 dark:text-white/60">
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                                Génération du document officiel…
                             </div>
-                        )}
-                        {!anchoring && anchorHash && (
-                            <div className="mt-2 space-y-1">
-                                <p className="text-sm text-gandehou-green">
-                                    ✓ Preuve soumise. Confirmation Bitcoin dans quelques heures.
-                                </p>
-                                <p className="break-all font-mono text-[10px] text-neutral-900/45 dark:text-white/45">
-                                    {anchorHash}
-                                </p>
-                            </div>
-                        )}
-                        {!anchoring && anchorError && (
-                            <p className="mt-2 text-sm text-gandehou-red">
-                                Ancrage échoué : {anchorError}
-                            </p>
-                        )}
-                        {!anchoring && !anchorHash && !anchorError && !generatingPdf && (
-                            <p className="mt-2 text-sm text-neutral-900/50 dark:text-white/50">
-                                En attente de la génération du PDF…
-                            </p>
+                        ) : (
+                            <iframe
+                                src={pdfPreviewUrl}
+                                title={`Attestation ${attestationNum}`}
+                                className="h-[600px] w-full"
+                            />
                         )}
                     </div>
+
+                    <p className="mt-3 text-center text-xs text-neutral-900/50 dark:text-white/50">
+                        Document provisoire — sans valeur de titre de propriété.
+                    </p>
 
                     <button
                         type="button"
@@ -391,6 +396,25 @@ export default function DossierReview() {
                             />
                         )}
                         {dossier.vendeur_phone && <Row label="Téléphone" value={dossier.vendeur_phone} />}
+                        {vendeurPieceUrl && (
+                            <div className="mt-3">
+                                <p className="mb-1.5 text-xs font-medium text-neutral-900/55 dark:text-white/55">Pièce d'identité</p>
+                                <a href={vendeurPieceUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                        src={vendeurPieceUrl}
+                                        alt="Pièce d'identité vendeur"
+                                        className="max-h-48 w-full rounded-xl border border-black/10 object-cover dark:border-white/10"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                    />
+                                </a>
+                            </div>
+                        )}
+                        {vendeurAudioUrl && (
+                            <div className="mt-3">
+                                <p className="mb-1.5 text-xs font-medium text-neutral-900/55 dark:text-white/55">Consentement vocal</p>
+                                <audio controls src={vendeurAudioUrl} className="w-full" />
+                            </div>
+                        )}
                     </Section>
 
                     <Section title="Acheteur">
@@ -403,6 +427,25 @@ export default function DossierReview() {
                             />
                         )}
                         {dossier.acheteur_phone && <Row label="Téléphone" value={dossier.acheteur_phone} />}
+                        {acheteurPieceUrl && (
+                            <div className="mt-3">
+                                <p className="mb-1.5 text-xs font-medium text-neutral-900/55 dark:text-white/55">Pièce d'identité</p>
+                                <a href={acheteurPieceUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                        src={acheteurPieceUrl}
+                                        alt="Pièce d'identité acheteur"
+                                        className="max-h-48 w-full rounded-xl border border-black/10 object-cover dark:border-white/10"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                    />
+                                </a>
+                            </div>
+                        )}
+                        {acheteurAudioUrl && (
+                            <div className="mt-3">
+                                <p className="mb-1.5 text-xs font-medium text-neutral-900/55 dark:text-white/55">Consentement vocal</p>
+                                <audio controls src={acheteurAudioUrl} className="w-full" />
+                            </div>
+                        )}
                     </Section>
 
                     <Section title="Parcelle">

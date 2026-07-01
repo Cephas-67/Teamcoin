@@ -1,4 +1,4 @@
-import { Bitcoin, Clock, FileText, FileWarning, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react'
+import { Clock, FileText, FileWarning, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 /**
@@ -40,7 +40,7 @@ const CONFIG: Record<ChipStatus, { label: string; tone: Tone; icon: typeof FileT
   atteste_cq: { label: 'Attesté CQ · provisoire', tone: 'yellow', icon: FileWarning },
   valide_mairie: { label: 'Validé Mairie', tone: 'green', icon: ShieldCheck },
   ots_pending: { label: 'Ancrage en attente', tone: 'yellow', icon: Clock },
-  ots_confirmed: { label: 'Ancré sur Bitcoin', tone: 'green', icon: Bitcoin },
+  ots_confirmed: { label: 'Ancrage confirmé', tone: 'green', icon: ShieldCheck },
   ots_mismatch: { label: 'Altéré', tone: 'red', icon: ShieldAlert },
   nouveau: { label: 'Nouveau', tone: 'green', icon: Sparkles },
 }

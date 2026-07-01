@@ -22,7 +22,6 @@ import { Link, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 import {
-  Bitcoin,
   Clock,
   ExternalLink,
   FileWarning,
@@ -112,17 +111,17 @@ const VERDICT: Record<VerdictKey, {
     accent: 'text-amber-600 dark:text-gandehou-yellow',
     badge: null,
     title: 'Validé par la Mairie · ancrage en cours',
-    message: 'La Mairie a approuvé ce dossier. L\'ancrage cryptographique sur Bitcoin est en cours de confirmation (généralement 1 h).',
-    disclaimer: 'Document provisoire en attente de confirmation Bitcoin. Toute altération devient détectable dès la prochaine vérification.',
+    message: 'La Mairie a approuvé ce dossier. L\'ancrage cryptographique est en cours de confirmation (généralement 1 h).',
+    disclaimer: 'Document provisoire en attente de confirmation d\'ancrage. Toute altération devient détectable dès la prochaine vérification.',
     live: 'polite',
   },
   confirmed: {
     icon: ShieldCheck,
     panel: 'border-gandehou-green/30 bg-gandehou-green/10 dark:bg-gandehou-green/5',
     accent: 'text-gandehou-green',
-    badge: 'Intégrité ancrée sur Bitcoin',
+    badge: 'Intégrité ancrée cryptographiquement',
     title: 'Convention authentique et certifiée',
-    message: 'Ce document a été horodaté et ancré sur Bitcoin via OpenTimestamps. Toute altération ultérieure serait détectable et prouvable publiquement.',
+    message: 'Ce document a été horodaté et ancré cryptographiquement. Toute altération ultérieure serait détectable et prouvable publiquement.',
     disclaimer: '',
     live: 'polite',
   },
@@ -267,10 +266,10 @@ export default function DossierTwin() {
             {v.message}
           </p>
 
-          {/* Bitcoin badge — confirmed only */}
+          {/* Ancrage badge — confirmed only */}
           {v.badge && (
             <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-gandehou-green px-4 py-2 text-sm font-semibold text-white">
-              <Bitcoin className="h-4 w-4" />
+              <ShieldCheck className="h-4 w-4" />
               {v.badge}
             </span>
           )}
@@ -357,8 +356,8 @@ export default function DossierTwin() {
             />
             {latestDoc && (
               <InfoRow
-                icon={latestDoc.ots_status === 'confirmed' ? Bitcoin : Clock}
-                label={latestDoc.ots_status === 'confirmed' ? 'Ancré sur Bitcoin le' : 'Ancrage soumis le'}
+                icon={latestDoc.ots_status === 'confirmed' ? ShieldCheck : Clock}
+                label={latestDoc.ots_status === 'confirmed' ? 'Ancrage confirmé le' : 'Ancrage soumis le'}
                 value={new Date(latestDoc.created_at).toLocaleDateString('fr-FR', {
                   day: 'numeric', month: 'long', year: 'numeric',
                 })}
@@ -383,7 +382,7 @@ export default function DossierTwin() {
 
         {/* ── Footer disclaimer ───────────────────────────────────── */}
         <p className="mt-8 text-center text-xs leading-relaxed text-neutral-900/40 dark:text-white/40">
-          Gandehou est une couche de preuve d'antériorité et d'intégrité, ancrée sur Bitcoin.
+          Gandehou est une couche de preuve d'antériorité et d'intégrité cryptographique.
           Ce n'est pas un titre de propriété. Seuls le Notaire et l'ANDF délivrent des actes
           opposables aux tiers (art. 18 CFD).
         </p>

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  Bitcoin,
   ExternalLink,
   FileText,
   FileUp,
@@ -81,7 +80,7 @@ export default function VerificationPortal() {
     setContext({ status: verdict, fileName: file.name, dossierId, reason, blockHeight, hash })
     setStatus(verdict)
 
-    // 2. Verification profonde en arriere-plan (crypto contre Bitcoin)
+    // 2. Verification profonde en arriere-plan (crypto contre ShieldCheck)
     // Ne rebascule le verdict qu'en cas de tampering detecte tardivement.
     if (verdict !== 'unknown') {
       verifyFileDeep(file).then((deep) => {
@@ -200,7 +199,7 @@ const VERDICTS = {
     panel: 'bg-gandehou-yellow/15 border-gandehou-yellow/40',
     accent: 'text-amber-500 dark:text-gandehou-yellow',
     title: 'Attestation provisoire',
-    message: 'Attestation de voisinage authentique · preuve soumise à Bitcoin, en attente de confirmation.',
+    message: 'Attestation de voisinage authentique · preuve soumise à l\'ancrage, en attente de confirmation.',
     disclaimer: 'Document provisoire — sans valeur de titre de propriété.',
     live: 'polite' as const,
   },
@@ -209,7 +208,7 @@ const VERDICTS = {
     panel: 'bg-gandehou-green/10 border-gandehou-green/30',
     accent: 'text-gandehou-green',
     title: 'Document authentique',
-    message: "L'empreinte du document correspond exactement à la version horodatée et ancrée sur Bitcoin.",
+    message: "L'empreinte du document correspond exactement à la version horodatée et ancrée cryptographiquement.",
     disclaimer: 'Toute altération future serait détectable et horodatée publiquement.',
     live: 'polite' as const,
   },
@@ -256,8 +255,8 @@ function VerdictPanel({ context, onReset }: { context: VerdictContext; onReset: 
 
       {status === 'authentic' && (
         <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-gandehou-green px-4 py-2 text-sm font-semibold text-white">
-          <Bitcoin className="h-4 w-4" />
-          {blockHeight ? `Ancré au bloc #${blockHeight}` : 'Intégrité ancrée'}
+          <ShieldCheck className="h-4 w-4" />
+          {blockHeight ? `Ancrage confirmé · bloc #${blockHeight}` : 'Intégrité ancrée'}
         </span>
       )}
 
