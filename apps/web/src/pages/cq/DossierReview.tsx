@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import {
-    ArrowLeft, CheckCircle2, Download, Loader2, MessageCircle,
+    ArrowLeft, Bitcoin, CheckCircle2, Download, Loader2, MessageCircle,
     ShieldCheck,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -25,6 +25,7 @@ import { StatusChip } from '@/components/StatusChip'
 import { supabase } from '@/lib/supabase'
 import { STORAGE_BUCKETS } from '@/lib/types'
 import { generateAttestationPdf } from '@/lib/attestationPdf'
+import { anchorDocument } from '@/services/anchor'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '@/public/logo.svg'
 import { cn } from '@/lib/cn'
@@ -73,6 +74,9 @@ export default function DossierReview() {
     const [pdfFilename, setPdfFilename] = useState('')
     const [pdfPublicUrl, setPdfPublicUrl] = useState('')
     const [generatingPdf, setGeneratingPdf] = useState(false)
+    const [anchoring, setAnchoring] = useState(false)
+    const [anchorHash, setAnchorHash] = useState('')
+    const [anchorError, setAnchorError] = useState('')
 
     useEffect(() => {
         if (!id) return
@@ -131,16 +135,41 @@ export default function DossierReview() {
                     .getPublicUrl(path)
                 setPdfPublicUrl(pub.publicUrl)
 
-                await supabase.from('documents').upsert({
-                    dossier_id: d.id,
-                    type: 'attestation_provisoire',
-                    storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
-                    storage_path: path,
-                    sha256,
-                    pdf_sha256: sha256,
-                    ots_status: 'pending',
-                    qr_code_url: link,
-                }, { onConflict: 'dossier_id,type' })
+                // Upsert de la ligne documents (retourne l'id pour l'ancrage)
+                const { data: docRow, error: docErr } = await supabase
+                    .from('documents')
+                    .upsert({
+                        dossier_id: d.id,
+                        type: 'attestation_provisoire',
+                        storage_bucket: STORAGE_BUCKETS.PROVISOIRES,
+                        storage_path: path,
+                        sha256,
+                        pdf_sha256: sha256,
+                        ots_status: 'pending',
+                        qr_code_url: link,
+                    }, { onConflict: 'dossier_id,type' })
+                    .select('id')
+                    .single()
+
+                setGeneratingPdf(false)
+
+                // Declenchement de l'ancrage OpenTimestamps (best-effort)
+                if (!docErr && docRow?.id) {
+                    setAnchoring(true)
+                    try {
+                        const result = await anchorDocument(docRow.id)
+                        if (result.ok) {
+                            setAnchorHash('hash' in result ? result.hash : '')
+                        } else {
+                            setAnchorError(result.error ?? 'Ancrage refuse')
+                        }
+                    } catch (e) {
+                        setAnchorError(e instanceof Error ? e.message : 'Erreur reseau')
+                    } finally {
+                        setAnchoring(false)
+                    }
+                }
+                return
             } else {
                 console.warn('[Gandehou] Upload PDF echoue — telechargement local seul.', upErr.message)
             }
@@ -240,6 +269,39 @@ export default function DossierReview() {
                         <p className="mt-3 text-xs text-neutral-900/50 dark:text-white/50">
                             Document provisoire — sans valeur de titre de propriété.
                         </p>
+                    </div>
+
+                    {/* ── Etat de l'ancrage OpenTimestamps ─────────────────── */}
+                    <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 text-left dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-900/60 dark:text-white/60">
+                            <Bitcoin className="h-3.5 w-3.5" /> Ancrage Bitcoin
+                        </div>
+                        {anchoring && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-neutral-900/70 dark:text-white/70">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Soumission au calendrier OpenTimestamps…
+                            </div>
+                        )}
+                        {!anchoring && anchorHash && (
+                            <div className="mt-2 space-y-1">
+                                <p className="text-sm text-gandehou-green">
+                                    ✓ Preuve soumise. Confirmation Bitcoin dans quelques heures.
+                                </p>
+                                <p className="break-all font-mono text-[10px] text-neutral-900/45 dark:text-white/45">
+                                    {anchorHash}
+                                </p>
+                            </div>
+                        )}
+                        {!anchoring && anchorError && (
+                            <p className="mt-2 text-sm text-gandehou-red">
+                                Ancrage échoué : {anchorError}
+                            </p>
+                        )}
+                        {!anchoring && !anchorHash && !anchorError && !generatingPdf && (
+                            <p className="mt-2 text-sm text-neutral-900/50 dark:text-white/50">
+                                En attente de la génération du PDF…
+                            </p>
+                        )}
                     </div>
 
                     <button

@@ -32,20 +32,11 @@ update public.dossiers
   set acheteur_id_type = 'cip'
   where acheteur_id_type is null and acheteur_cip is not null;
 
--- Renommage : *_cip devient *_id_value (contenu générique CIP ou passeport)
--- Idempotent : ne rename que si la nouvelle colonne n'existe pas encore
-do $$
-begin
-  if not exists (select 1 from information_schema.columns
-                 where table_schema='public' and table_name='dossiers' and column_name='vendeur_id_value') then
-    alter table public.dossiers rename column vendeur_cip to vendeur_id_value;
-  end if;
-
-  if not exists (select 1 from information_schema.columns
-                 where table_schema='public' and table_name='dossiers' and column_name='acheteur_id_value') then
-    alter table public.dossiers rename column acheteur_cip to acheteur_id_value;
-  end if;
-end $$;
+-- NOTE : le rename de *_cip vers *_id_value a été ANNULÉ pour préserver la compat
+-- avec le front en production. Le champ vendeur_cip / acheteur_cip garde son nom
+-- et contient une valeur générique (CIP OU numéro de passeport), discriminée par
+-- vendeur_id_type / acheteur_id_type.
+-- Voir migration 2026_07_rollback_cip_rename.sql pour le rollback si nécessaire.
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
