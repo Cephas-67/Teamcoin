@@ -1,6 +1,10 @@
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║ Gandehou · types TypeScript miroirs du schéma Supabase                   ║
-// ║ Source de vérité : supabase/schema.sql                                   ║
+// ║ Source de vérité : supabase/schema.sql + migrations                       ║
+// ║                                                                          ║
+// ║ Bipartite : chaque transaction implique vendeur ET acheteur, chacun      ║
+// ║ avec son identifiant (CIP béninois OU passeport), son audio de           ║
+// ║ consentement, et sa signature biométrique WebAuthn.                      ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
 // ─── Enums (alignés sur les CHECK constraints SQL) ──────────────────────────
@@ -8,10 +12,10 @@
 export type ProfileRole = "chef_quartier" | "agent_mairie" | "admin";
 
 export type DossierStatut =
-  | "brouillon"        // créé par le chef, pas encore attesté
+  | "brouillon"        // créé, données saisies, pas encore ancré
   | "atteste_cq"       // attestation provisoire signée par le CQ, ancrée OTS
   | "valide_mairie"    // convention finale validée par la Mairie, second ancrage
-  | "litige";          // marqué litigieux (démo : badge rouge)
+  | "litige";          // marqué litigieux (badge rouge)
 
 export type Zone = "urbaine" | "rurale";
 
@@ -21,6 +25,11 @@ export type OtsStatus =
   | "pending"      // preuve soumise, pas encore minée
   | "confirmed"    // ancrée dans un bloc Bitcoin confirmé
   | "mismatch";    // hash recalculé != hash ancré
+
+// Type d'identifiant (CFD béninois : CIP pour nationaux, passeport pour étrangers)
+export type IdType = "cip" | "passeport";
+
+export type Partie = "vendeur" | "acheteur";
 
 // ─── profiles ───────────────────────────────────────────────────────────────
 
@@ -42,21 +51,27 @@ export type Dossier = {
   id: string;
   statut: DossierStatut;
 
+  // Vendeur
   vendeur_nom: string;
-  vendeur_cip: string | null;
+  vendeur_id_type: IdType | null;
+  vendeur_id_value: string | null;   // ex-vendeur_cip (CIP ou n° passeport)
   vendeur_phone: string | null;
 
+  // Acheteur
   acheteur_nom: string;
-  acheteur_cip: string | null;
+  acheteur_id_type: IdType | null;
+  acheteur_id_value: string | null;  // ex-acheteur_cip (CIP ou n° passeport)
   acheteur_phone: string | null;
-  acheteur_nationalite: string | null;
+  acheteur_nationalite: string | null;  // "beninoise" ou "etrangere" (dérivé de id_type par défaut)
 
+  // Localisation
   departement: string | null;
   commune: string;
   arrondissement: string | null;
   quartier: string;
   zone: Zone;
 
+  // Parcelle
   parcelle_ref: string | null;
   superficie_m2: number | null;
   voisin_nord: string | null;
@@ -71,6 +86,7 @@ export type Dossier = {
 
   cree_par: string | null;
 
+  // Drapeaux calculés par le moteur ANDF
   flag_etranger_zone_rurale: boolean;
   flag_superficie_seuil: boolean;
 
@@ -86,7 +102,7 @@ export type DossierInput = Omit<
   statut?: DossierStatut;
 };
 
-// ─── documents ──────────────────────────────────────────────────────────────
+// ─── documents · schéma bipartite ───────────────────────────────────────────
 
 export type Document = {
   id: string;
@@ -96,22 +112,36 @@ export type Document = {
   storage_bucket: string;
   storage_path: string;
 
-  // sha256 = hash ANCRÉ sur Bitcoin.
-  // - Si pas d'audio : sha256 == pdf_sha256
-  // - Si audio       : sha256 == combinedHash(pdf_sha256, audio_sha256)
+  // sha256 = combined hash ANCRÉ sur Bitcoin.
+  // Formule (cascade, ordre stable) :
+  //   acc = pdf_sha256
+  //   si vendeur_audio_sha256   -> acc = SHA-256(acc :: vendeur_audio_sha256)
+  //   si acheteur_audio_sha256  -> acc = SHA-256(acc :: acheteur_audio_sha256)
+  //   si vendeur_pubkey_hash    -> acc = SHA-256(acc :: vendeur_pubkey_hash)
+  //   si acheteur_pubkey_hash   -> acc = SHA-256(acc :: acheteur_pubkey_hash)
   sha256: string;
   pdf_sha256: string | null;
   hash_parent: string | null;
 
-  // Audio attaché (optionnel) · enregistrement vocal du consentement
-  audio_storage_path: string | null;
-  audio_sha256: string | null;
+  // Audio VENDEUR
+  vendeur_audio_path: string | null;
+  vendeur_audio_sha256: string | null;
 
-  // Signature biométrique WebAuthn / Passkey (optionnel)
-  signataire_pubkey_hash: string | null;
-  signataire_credential_id: string | null;
-  signataire_pubkey_jwk: Record<string, unknown> | null;
-  signataire_nom: string | null;
+  // Audio ACHETEUR
+  acheteur_audio_path: string | null;
+  acheteur_audio_sha256: string | null;
+
+  // Signature biométrique VENDEUR (WebAuthn/Passkey)
+  vendeur_pubkey_hash: string | null;
+  vendeur_credential_id: string | null;
+  vendeur_pubkey_jwk: Record<string, unknown> | null;
+  vendeur_signataire_nom: string | null;
+
+  // Signature biométrique ACHETEUR
+  acheteur_pubkey_hash: string | null;
+  acheteur_credential_id: string | null;
+  acheteur_pubkey_jwk: Record<string, unknown> | null;
+  acheteur_signataire_nom: string | null;
 
   // Ancrage Bitcoin
   ots_status: OtsStatus;
@@ -143,20 +173,17 @@ export type StatusHistoryEntry = {
   changed_at: string;
 };
 
-// ─── Vues composées (lecture seule, jointures côté app) ─────────────────────
+// ─── Vues composées ─────────────────────────────────────────────────────────
 
-// Dossier + ses documents (pour la page /dossier/:id)
 export type DossierAvecDocuments = Dossier & {
   documents: Document[];
 };
 
-// Dossier + dernier document (pour les listes du dashboard)
 export type DossierAvecDernierDocument = Dossier & {
   dernier_document: Document | null;
 };
 
 // ─── Buckets Supabase Storage ───────────────────────────────────────────────
-// Constantes pour éviter les fautes de frappe disséminées dans le code
 
 export const STORAGE_BUCKETS = {
   PROVISOIRES: "documents-provisoires",
@@ -166,3 +193,24 @@ export const STORAGE_BUCKETS = {
 } as const;
 
 export type StorageBucket = (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS];
+
+// ─── Bundle input bipartite · pour createDocumentBundle et submitDossierComplete
+// Une partie (vendeur OU acheteur) optionnellement munie de son audio + signature.
+
+export type PartieContribution = {
+  audio?: {
+    blob: Blob;
+    sha256: string;  // hash calculé côté client
+  };
+  signature?: {
+    pubkeyHash: string;          // SHA-256(publicKey brute)
+    credentialId: string;        // base64url
+    publicKeyJwk?: Record<string, unknown>;
+    signataireNom?: string;
+  };
+};
+
+export type BipartiteBundle = {
+  vendeur?: PartieContribution;
+  acheteur?: PartieContribution;
+};
