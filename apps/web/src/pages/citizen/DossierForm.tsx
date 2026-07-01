@@ -10,7 +10,7 @@ import Stepper, { Step } from '@/components/Stepper'
 import { AudioRecorder } from '@/components/AudioRecorder'
 import { FingerprintCapture, type CapturedSignature } from '@/components/FingerprintCapture'
 import { supabase } from '@/lib/supabase'
-import { uploadCitizenAudio, uploadCitizenPiece } from '@/services/citizenCaptures'
+import { uploadCitizenAudio, uploadCitizenPiece, uploadCitizenPlan } from '@/services/citizenCaptures'
 
 /* ------------------------------------------------------------------ *
  * Validation helpers
@@ -237,10 +237,11 @@ export default function DossierForm() {
         const dossierId = crypto.randomUUID()
 
         try {
-            // 1. Upload en parallele des pieces d'identite (bucket prive)
-            const [vp, ap] = await Promise.all([
+            // 1. Upload en parallele : pieces d'identite + plan du terrain
+            const [vp, ap, planUploaded] = await Promise.all([
                 uploadCitizenPiece(dossierId, 'vendeur', pieceVendeur[0]),
                 uploadCitizenPiece(dossierId, 'acheteur', pieceAcheteur[0]),
+                uploadCitizenPlan(dossierId, plan[0]),
             ])
 
             // 2. Upload en parallele des audios (facultatifs)
@@ -282,6 +283,9 @@ export default function DossierForm() {
                     acheteur_piece_id_path: ap.path,
                     acheteur_piece_id_sha256: ap.sha256,
                     acheteur_piece_id_mime: ap.mime,
+                    plan_terrain_path: planUploaded.path,
+                    plan_terrain_sha256: planUploaded.sha256,
+                    plan_terrain_mime: planUploaded.mime,
                     vendeur_audio_path: va?.path ?? null,
                     vendeur_audio_sha256: va?.sha256 ?? null,
                     acheteur_audio_path: aa?.path ?? null,

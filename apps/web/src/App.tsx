@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from '@/auth/AuthProvider'
 import { RedirectIfAuthed, RequireAuth } from '@/auth/RouteGuards'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import CqPortal from './pages/cq/CqPortal'
 
 /* ── Lazy page imports ─────────────────────────────────────────────── */
@@ -74,6 +75,7 @@ function NotFound() {
 export default function App() {
   return (
     <AuthProvider>
+      <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Landing — always public */}
@@ -112,6 +114,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
 
       <Toaster
         position="bottom-center"

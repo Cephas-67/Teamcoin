@@ -80,6 +80,7 @@ export default function DossierReview() {
     const [acheteurPieceUrl, setAcheteurPieceUrl] = useState('')
     const [vendeurAudioUrl, setVendeurAudioUrl] = useState('')
     const [acheteurAudioUrl, setAcheteurAudioUrl] = useState('')
+    const [planTerrainUrl, setPlanTerrainUrl] = useState('')
     // Blob URL du PDF · cree UNE FOIS quand le blob est dispo, revoke a l'unmount.
     // Sans ce useEffect, l'iframe se rechargeait a chaque re-render.
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState('')
@@ -132,6 +133,12 @@ export default function DossierReview() {
                 .from('pieces-identite')
                 .createSignedUrl(dAny.vendeur_piece_id_path, 300)
             if (data?.signedUrl) setVendeurPieceUrl(data.signedUrl)
+        }
+        if ((dAny as { plan_terrain_path?: string | null }).plan_terrain_path) {
+            const { data } = await supabase.storage
+                .from('pieces-identite')
+                .createSignedUrl((dAny as { plan_terrain_path: string }).plan_terrain_path, 300)
+            if (data?.signedUrl) setPlanTerrainUrl(data.signedUrl)
         }
         if (dAny.acheteur_piece_id_path) {
             const { data } = await supabase.storage
@@ -485,6 +492,19 @@ export default function DossierReview() {
                         {dossier.superficie_m2 && <Row label="Superficie" value={`${dossier.superficie_m2.toLocaleString('fr-FR')} m²`} />}
                         {dossier.zone && <Row label="Zone" value={dossier.zone} className="capitalize" />}
                         {dossier.origine_droit && <Row label="Origine du droit" value={dossier.origine_droit.replace(/_/g, ' ')} />}
+                        {planTerrainUrl && (
+                            <div className="mt-3">
+                                <p className="mb-1.5 text-xs font-medium text-neutral-900/55 dark:text-white/55">Plan du terrain (géomètre)</p>
+                                <a href={planTerrainUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                        src={planTerrainUrl}
+                                        alt="Plan du terrain"
+                                        className="max-h-64 w-full rounded-xl border border-black/10 object-contain bg-white dark:border-white/10"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                    />
+                                </a>
+                            </div>
+                        )}
                     </Section>
 
                     <Section title="Voisinage déclaré" accent>

@@ -86,6 +86,31 @@ const ALLOWED_ID_MIME = [
 ];
 const MAX_ID_SIZE = 5 * 1024 * 1024; // 5 MB
 
+// Upload du plan du geometre (parcelle terrain). Meme bucket prive.
+export async function uploadCitizenPlan(
+  dossierId: string,
+  file: File,
+): Promise<UploadedCitizenPiece> {
+  const mime = file.type || "application/octet-stream";
+  const nameOk = /\.(jpe?g|png|webp|heic|heif|pdf)$/i.test(file.name);
+  if (!ALLOWED_ID_MIME.includes(mime) && !nameOk) {
+    throw new Error("Format non accepte pour le plan (PDF, JPG, PNG, WEBP, HEIC).");
+  }
+  if (file.size <= 0) throw new Error("Fichier plan vide.");
+  if (file.size > MAX_ID_SIZE) throw new Error("Plan trop lourd (5 MB max).");
+
+  const ext = extFromMime(mime, "jpg");
+  const path = `${dossierId}/plan-terrain.${ext}`;
+  const sha256 = await sha256Hex(file);
+
+  const { error } = await supabase.storage
+    .from(PIECES_BUCKET)
+    .upload(path, file, { contentType: mime, upsert: true });
+  if (error) throw new Error(`uploadCitizenPlan : ${error.message}`);
+
+  return { path, sha256, mime };
+}
+
 export async function uploadCitizenPiece(
   dossierId: string,
   party: Party,

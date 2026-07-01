@@ -100,15 +100,16 @@ export default function Connexion() {
     if (otp !== PHONE_DEMO_OTP) { setError('Code incorrect.'); setOtp(''); return }
     setError('')
     loginWithPhoneDemo(phone)
-    // Store the role from /onboarding so AuthProvider can read it
-    // (phone-demo users have no profiles row in Supabase).
     if (roleFromOnboarding) {
       localStorage.setItem('gandehou-demo-role', roleFromOnboarding)
     }
     await refresh()
     setStep('success')
-    setTimeout(() => navigate(redirectTo, { replace: true }), 1100)
-  }, [phone, otp, navigate, redirectTo, refresh, roleFromOnboarding])
+    // window.location.assign force un reload complet : la nouvelle session
+    // est relue par AuthProvider avant que RequireAuth ne s'evalue. Sinon
+    // le navigate SPA arrivait avant que le state chef soit propage.
+    setTimeout(() => { window.location.assign(redirectTo) }, 800)
+  }, [phone, otp, redirectTo, refresh, roleFromOnboarding])
 
   useEffect(() => {
     if (otp.length === 6 && step === 'otp') {
