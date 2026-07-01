@@ -13,18 +13,48 @@ import { supabase } from '@/lib/supabase'
 import { uploadCitizenAudio, uploadCitizenPiece } from '@/services/citizenCaptures'
 
 /* ------------------------------------------------------------------ *
- * Constants
+ * Validation helpers
  * ------------------------------------------------------------------ */
-const PI_TYPES = ['carte_identite', 'passeport'] as const
-type PiType = (typeof PI_TYPES)[number]
 
+// NPI béninois : exactement 13 chiffres.
+const NPI_REGEX = /^\d{13}$/
+// Passeport : 6–9 caractères alphanumériques (norme OACI).
+const PASSPORT_REGEX = /^[A-Z0-9]{6,9}$/i
+// V1 Bénin · exactement 8 chiffres locaux, prefixe +229 ajoute automatiquement.
+const PHONE_REGEX = /^\d{8}$/
+const phoneSchema = z
+    .string()
+    .min(1, 'Numéro requis.')
+    .refine((v) => PHONE_REGEX.test(v.replace(/\s+/g, '')), 'Numéro invalide (8 chiffres, ex : 97 00 00 00).')
+    .transform((v) => `+229${v.replace(/\s+/g, '')}`)
+// Accepte NPI OU passeport — le champ est "CIP ou passeport".
+const pieceSchema = z
+    .string()
+    .min(1, 'CIP ou passeport requis.')
+    .refine(
+        (v) => NPI_REGEX.test(v.trim()) || PASSPORT_REGEX.test(v.trim()),
+        'Format invalide. NPI : 13 chiffres. Passeport : 6–9 caractères alphanumériques.',
+    )
+
+// Noms : lettres (avec accents), espaces, tirets, apostrophes. Pas de chiffres.
 const NAME_REGEX = /^[\p{L}\s'\u2019-]{2,100}$/u
+const nameSchema = (label: string) =>
+    z
+        .string()
+        .min(2, `${label} requis (2 caractères minimum).`)
+        .regex(NAME_REGEX, `${label} : lettres, espaces et tirets uniquement.`)
+        .transform((v) => v.trim())
 
-const NATIONALITES = [
-    'Béninoise', 'Nigériane', 'Togolaise', 'Burkinabè', 'Ghanéenne',
-    'Nigérienne', 'Ivoirienne', 'Malienne', 'Sénégalaise', 'Camerounaise',
-    'Française', 'Libanaise', 'Chinoise', 'Indienne', 'Autre',
-] as const
+// Localisation : mêmes règles que les noms (noms de lieux béninois).
+const locationSchema = (label: string) =>
+    z
+        .string()
+        .min(2, `${label} requis.`)
+        .regex(NAME_REGEX, `${label} : lettres, espaces et tirets uniquement.`)
+        .transform((v) => v.trim())
+
+// V1 Bénin uniquement. Nationalite hardcodee au submit via input hidden.
+const NATIONALITES = ['Béninoise'] as const
 
 const ORIGINES = [
     { value: 'titre_foncier', label: 'Titre Foncier' },
@@ -33,51 +63,56 @@ const ORIGINES = [
     { value: 'autre', label: 'Autre' },
 ] as const
 
-const isForeigner = (nat?: string) => !!nat && nat !== 'Béninoise'
+// V1 Bénin · tout le monde beninois par definition.
+const isForeigner = (_nat?: string) => false
 
 /* ------------------------------------------------------------------ *
- * Schema — no manual PI number entry; the user uploads the document.
+ * Schema
  * ------------------------------------------------------------------ */
-const nameSchema = (label: string) =>
-    z.string().min(2, `${label} requis (2 car. min).`)
-        .regex(NAME_REGEX, `${label} : lettres, espaces et tirets uniquement.`)
-        .transform((v) => v.trim())
-
-const locationSchema = (label: string) =>
-    z.string().min(1, `${label} requis.`).transform((v) => v.trim())
-
 const schema = z
     .object({
         vendeur_nom: nameSchema('Nom du vendeur'),
-        vendeur_pi_type: z.enum(PI_TYPES, { required_error: "Choisissez le type de pièce d'identité." }),
+        vendeur_cip: pieceSchema,
+        vendeur_phone: phoneSchema,
         acheteur_nom: nameSchema("Nom de l'acheteur"),
-        acheteur_nationalite: z.enum(NATIONALITES, { required_error: 'Nationalité requise.' }),
-        acheteur_pi_type: z.enum(PI_TYPES, { required_error: "Choisissez le type de pièce d'identité." }),
+        acheteur_nationalite: z.enum(NATIONALITES, {
+            required_error: 'Nationalité requise.',
+        }),
+        acheteur_cip: pieceSchema,
+        acheteur_phone: phoneSchema,
         departement: locationSchema('Département'),
         commune: locationSchema('Commune'),
         arrondissement: locationSchema('Arrondissement'),
         quartier: locationSchema('Quartier'),
-        superficie_m2: z.coerce.number({ invalid_type_error: 'Superficie requise (m²).' })
-            .positive('Doit être positive.').max(10_000_000, 'Max 10 000 000 m².'),
+        superficie_m2: z.coerce
+            .number({ invalid_type_error: 'Superficie requise (m²).' })
+            .positive('La superficie doit être positive.')
+            .max(10_000_000, 'Superficie trop grande (max 10 000 000 m² / 1 000 ha).'),
         zone: z.enum(['urbaine', 'rurale'], { required_error: 'Choisissez le type de zone.' }),
-        origine_droit: z.enum(['titre_foncier', 'adc', 'lot', 'autre'], { required_error: "Origine du droit requise." }),
+        origine_droit: z.enum(['titre_foncier', 'adc', 'lot', 'autre'], {
+            required_error: "Précisez l'origine du droit.",
+        }),
         voisin_nord: nameSchema('Voisin Nord'),
         voisin_sud: nameSchema('Voisin Sud'),
         voisin_est: nameSchema('Voisin Est'),
         voisin_ouest: nameSchema('Voisin Ouest'),
     })
     .superRefine((v, ctx) => {
-        // ANDF blocking rule — rural + foreigner
         if (v.zone === 'rurale' && isForeigner(v.acheteur_nationalite)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['zone'], message: 'En zone rurale, seuls les Béninois peuvent acquérir (art. 367 CFD).' })
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['zone'],
+                message:
+                    "En zone rurale, seuls les ressortissants béninois peuvent acquérir (art. 367 CFD).",
+            })
         }
     })
 
 type DossierValues = z.infer<typeof schema>
 
 const STEP_FIELDS: (keyof DossierValues)[][] = [
-    ['vendeur_nom', 'vendeur_pi_type'],
-    ['acheteur_nom', 'acheteur_nationalite', 'acheteur_pi_type'],
+    ['vendeur_nom', 'vendeur_cip', 'vendeur_phone'],
+    ['acheteur_nom', 'acheteur_nationalite', 'acheteur_cip', 'acheteur_phone'],
     ['departement', 'commune', 'arrondissement', 'quartier'],
     ['superficie_m2', 'zone', 'origine_droit'],
     ['voisin_nord', 'voisin_sud', 'voisin_est', 'voisin_ouest'],
@@ -91,10 +126,7 @@ const inputCls =
     'focus-visible:border-gandehou-green focus-visible:ring-4 focus-visible:ring-gandehou-green/20 ' +
     'aria-[invalid=true]:border-gandehou-red dark:border-white/15 dark:bg-white/5 dark:text-white'
 
-const selectCls = inputCls + ' appearance-none'
-
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+const selectCls = inputCls + ' appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat'
 
 /* ------------------------------------------------------------------ *
  * Component
@@ -165,74 +197,26 @@ export default function DossierForm() {
         setDraftRestored(false)
     }
 
-    // Watch PI types for dynamic UI
-    const vendeurPiType = watch('vendeur_pi_type')
-    const acheteurPiType = watch('acheteur_pi_type')
-
-    // Watch for ANDF warnings
+    // Règles ANDF non bloquantes (avertissements).
     const nat = watch('acheteur_nationalite')
     const zone = watch('zone')
     const superficie = watch('superficie_m2')
     const warnings: string[] = []
     if (zone === 'urbaine' && isForeigner(nat))
-        warnings.push('Acheteur étranger en zone urbaine : bail emphytéotique de 50 ans uniquement.')
+        warnings.push(
+            'Acheteur étranger en zone urbaine : acquisition possible uniquement via bail emphytéotique de 50 ans non renouvelable.',
+        )
     if (zone === 'rurale' && Number(superficie) > 20_000)
-        warnings.push('Superficie > 2 ha en zone rurale : approbation CoGeF / Conseil communal requise.')
+        warnings.push(
+            'Superficie > 2 ha en zone rurale : approbation CoGeF / Conseil communal requise.',
+        )
 
-    // ── Territorial cascade ──────────────────────────────────────────
-    useEffect(() => {
-        setLoadingTerr(true)
-        fetchDepartements()
-            .then(setDepartements)
-            .finally(() => setLoadingTerr(false))
-    }, [])
-
-    const handleDeptChange = (idStr: string) => {
-        const id = Number(idStr)
-        setSelectedDeptId(id)
-        setSelectedCommuneId(null)
-        setSelectedArrondId(null)
-        setCommunes([]); setArrondissements([]); setQuartiers([])
-        setValue('departement', departements.find((d) => d.id === id)?.label ?? '')
-        setValue('commune', ''); setValue('arrondissement', ''); setValue('quartier', '')
-        setLoadingTerr(true)
-        fetchCommunes(id).then(setCommunes).finally(() => setLoadingTerr(false))
+    const goToStep = (target: number) => {
+        if (target < step) setStep(target)
     }
-
-    const handleCommuneChange = (idStr: string) => {
-        const id = Number(idStr)
-        setSelectedCommuneId(id)
-        setSelectedArrondId(null)
-        setArrondissements([]); setQuartiers([])
-        setValue('commune', communes.find((c) => c.id === id)?.label ?? '')
-        setValue('arrondissement', ''); setValue('quartier', '')
-        if (selectedDeptId) {
-            setLoadingTerr(true)
-            fetchArrondissements(selectedDeptId, id).then(setArrondissements).finally(() => setLoadingTerr(false))
-        }
+    const handleNext = async () => {
+        if (await trigger(STEP_FIELDS[step - 1])) setStep((s) => s + 1)
     }
-
-    const handleArrondChange = (idStr: string) => {
-        const id = Number(idStr)
-        setSelectedArrondId(id)
-        setQuartiers([])
-        setValue('arrondissement', arrondissements.find((a) => a.id === id)?.label ?? '')
-        setValue('quartier', '')
-        if (selectedDeptId && selectedCommuneId) {
-            setLoadingTerr(true)
-            fetchQuartiers(selectedDeptId, selectedCommuneId, id).then(setQuartiers).finally(() => setLoadingTerr(false))
-        }
-    }
-
-    const handleQuartierChange = (idStr: string) => {
-        const id = Number(idStr)
-        setValue('quartier', quartiers.find((q) => q.id === id)?.label ?? '')
-    }
-
-    // ── Navigation ───────────────────────────────────────────────────
-    const goToStep = (target: number) => { if (target < step) setStep(target) }
-    const handleNext = async () => { if (await trigger(STEP_FIELDS[step - 1])) setStep((s) => s + 1) }
-
     const handleComplete = async () => {
         // Etape 6 obligatoire : plan + 2 pieces d'identite (vendeur + acheteur)
         if (plan.length === 0) return setDocError('Ajoutez le plan du géomètre.')
@@ -337,11 +321,11 @@ export default function DossierForm() {
 
     return (
         <div className="min-h-screen w-full bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
-            <PortalNav backTo={isCQ ? '/cq/dashboard' : '/citizen-portal'} />
+            <PortalNav backTo="/citizen-portal" />
 
             <main className="mx-auto w-full max-w-3xl px-6 pb-20">
                 {submitted ? (
-                    <DossierSuccess num={submitted} />
+                    <DossierSuccess id={submitted.id} phone={submitted.phone} />
                 ) : (
                     <>
                         <h1 className="mb-2 text-center text-3xl font-semibold xl:text-5xl">Initier un dossier</h1>
@@ -376,7 +360,7 @@ export default function DossierForm() {
                             onNext={handleNext}
                             onComplete={handleComplete}
                         >
-                            {/* ── Step 1: Vendeur ──────────────────────────────────── */}
+                            {/* 1 — Vendeur */}
                             <Step>
                                 <fieldset className="space-y-5">
                                     <legend className="mb-4 text-xl font-semibold">Identité du vendeur</legend>
@@ -384,155 +368,79 @@ export default function DossierForm() {
                                         <input id="vendeur_nom" className={inputCls} aria-invalid={!!errors.vendeur_nom}
                                             placeholder="ex : Ahouandjinou Kossi" {...register('vendeur_nom')} />
                                     </Field>
-
-                                    <PiTypeSelector
-                                        name="vendeur_pi_type"
-                                        register={register}
-                                        current={vendeurPiType}
-                                    />
-
-                                    <FilePick
-                                        id="vendeur_id_doc"
-                                        label={vendeurPiType === 'carte_identite'
-                                            ? "Photo de la Carte d'identité (CIP) du vendeur"
-                                            : "Photo du passeport du vendeur"}
-                                        hint="PDF ou image (JPEG, PNG, WebP) — 5 Mo max"
-                                        accept=".jpg,.jpeg,.png,.webp,.pdf"
-                                        files={vendeurIdDoc}
-                                        onFiles={setVendeurIdDoc}
-                                        required
-                                    />
-
-                                    <AudioRecorder
-                                        onRecorded={setVendeurAudio}
-                                        maxDuration={60}
-                                    />
-                                    {vendeurAudio && (
-                                        <p className="text-xs text-gandehou-green">✓ Consentement vocal du vendeur enregistré</p>
-                                    )}
+                                    <Field label="NPI (13 chiffres) ou passeport" error={errors.vendeur_cip?.message} htmlFor="vendeur_cip">
+                                        <input id="vendeur_cip" className={inputCls} aria-invalid={!!errors.vendeur_cip}
+                                            placeholder="ex : 1234567890123" inputMode="text" maxLength={13} {...register('vendeur_cip')} />
+                                        <p className="mt-1 text-xs text-neutral-900/40 dark:text-white/40">
+                                            NPI : 13 chiffres · Passeport : 6–9 caractères
+                                        </p>
+                                    </Field>
+                                    <Field label="Téléphone (WhatsApp)" error={errors.vendeur_phone?.message} htmlFor="vendeur_phone">
+                                        <div className="flex overflow-hidden rounded-xl border border-black/10 focus-within:border-gandehou-green focus-within:ring-4 focus-within:ring-gandehou-green/20 dark:border-white/15">
+                                            <span className="flex items-center bg-black/5 px-3 text-sm font-medium text-neutral-900/70 dark:bg-white/10 dark:text-white/70">+229</span>
+                                            <input id="vendeur_phone" type="tel" inputMode="numeric" maxLength={8}
+                                                className="w-full bg-white px-3 py-3 text-black outline-none dark:bg-white/5 dark:text-white"
+                                                aria-invalid={!!errors.vendeur_phone}
+                                                placeholder="97 00 00 00" {...register('vendeur_phone')} />
+                                        </div>
+                                    </Field>
                                 </fieldset>
                             </Step>
 
-                            {/* ── Step 2: Acheteur ─────────────────────────────────── */}
+                            {/* 2 — Acheteur (nationalite hardcodee V1 · Benin uniquement) */}
                             <Step>
                                 <fieldset className="space-y-5">
                                     <legend className="mb-4 text-xl font-semibold">Identité de l'acheteur</legend>
+                                    <input type="hidden" value="Béninoise" {...register('acheteur_nationalite')} />
                                     <Field label="Noms et prénoms" error={errors.acheteur_nom?.message} htmlFor="acheteur_nom">
                                         <input id="acheteur_nom" className={inputCls} aria-invalid={!!errors.acheteur_nom}
                                             placeholder="ex : Dossou Amina" {...register('acheteur_nom')} />
                                     </Field>
-
-                                    <Field label="Nationalité" error={errors.acheteur_nationalite?.message} htmlFor="acheteur_nat">
-                                        <select id="acheteur_nat" className={selectCls} aria-invalid={!!errors.acheteur_nationalite}
-                                            defaultValue="" {...register('acheteur_nationalite')}>
-                                            <option value="" disabled>Sélectionner…</option>
-                                            {NATIONALITES.map((n) => <option key={n} value={n}>{n}</option>)}
-                                        </select>
+                                    <Field label="NPI (13 chiffres) ou passeport" error={errors.acheteur_cip?.message} htmlFor="acheteur_cip">
+                                        <input id="acheteur_cip" className={inputCls} aria-invalid={!!errors.acheteur_cip}
+                                            placeholder="ex : 1234567890123" inputMode="text" maxLength={13} {...register('acheteur_cip')} />
+                                        <p className="mt-1 text-xs text-neutral-900/40 dark:text-white/40">
+                                            NPI : 13 chiffres · Passeport : 6–9 caractères
+                                        </p>
                                     </Field>
-
-                                    <PiTypeSelector
-                                        name="acheteur_pi_type"
-                                        register={register}
-                                        current={acheteurPiType}
-                                    />
-
-                                    <FilePick
-                                        id="acheteur_id_doc"
-                                        label={acheteurPiType === 'carte_identite'
-                                            ? "Photo de la Carte d'identité (CIP) de l'acheteur"
-                                            : "Photo du passeport de l'acheteur"}
-                                        hint="PDF ou image (JPEG, PNG, WebP) — 5 Mo max"
-                                        accept=".jpg,.jpeg,.png,.webp,.pdf"
-                                        files={acheteurIdDoc}
-                                        onFiles={setAcheteurIdDoc}
-                                        required
-                                    />
-
-                                    <AudioRecorder
-                                        onRecorded={setAcheteurAudio}
-                                        maxDuration={60}
-                                    />
-                                    {acheteurAudio && (
-                                        <p className="text-xs text-gandehou-green">✓ Consentement vocal de l'acheteur enregistré</p>
-                                    )}
+                                    <Field label="Téléphone (WhatsApp)" error={errors.acheteur_phone?.message} htmlFor="acheteur_phone">
+                                        <div className="flex overflow-hidden rounded-xl border border-black/10 focus-within:border-gandehou-green focus-within:ring-4 focus-within:ring-gandehou-green/20 dark:border-white/15">
+                                            <span className="flex items-center bg-black/5 px-3 text-sm font-medium text-neutral-900/70 dark:bg-white/10 dark:text-white/70">+229</span>
+                                            <input id="acheteur_phone" type="tel" inputMode="numeric" maxLength={8}
+                                                className="w-full bg-white px-3 py-3 text-black outline-none dark:bg-white/5 dark:text-white"
+                                                aria-invalid={!!errors.acheteur_phone}
+                                                placeholder="97 00 00 00" {...register('acheteur_phone')} />
+                                        </div>
+                                    </Field>
                                 </fieldset>
                             </Step>
 
-                            {/* ── Step 3: Localisation (cascading selects via API) ──── */}
+                            {/* 3 — Localisation */}
                             <Step>
                                 <fieldset className="space-y-5">
                                     <legend className="mb-4 text-xl font-semibold">Localisation</legend>
-                                    {loadingTerr && departements.length === 0 && (
-                                        <div className="flex items-center gap-2 rounded-xl bg-gandehou-yellow/15 px-4 py-3 text-sm text-amber-900 dark:text-gandehou-yellow">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            Chargement des divisions territoriales…
-                                        </div>
-                                    )}
                                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                                         <Field label="Département" error={errors.departement?.message} htmlFor="departement">
-                                            <select
-                                                id="departement"
-                                                className={selectCls}
-                                                aria-invalid={!!errors.departement}
-                                                value={selectedDeptId ?? ''}
-                                                onChange={(e) => handleDeptChange(e.target.value)}
-                                            >
-                                                <option value="" disabled>Sélectionner…</option>
-                                                {departements.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-                                            </select>
-                                            {/* Hidden input for react-hook-form validation */}
-                                            <input type="hidden" {...register('departement')} />
+                                            <input id="departement" className={inputCls} aria-invalid={!!errors.departement}
+                                                placeholder="ex : Littoral" {...register('departement')} />
                                         </Field>
-
                                         <Field label="Commune" error={errors.commune?.message} htmlFor="commune">
-                                            <select
-                                                id="commune"
-                                                className={selectCls}
-                                                aria-invalid={!!errors.commune}
-                                                value={selectedCommuneId ?? ''}
-                                                onChange={(e) => handleCommuneChange(e.target.value)}
-                                                disabled={communes.length === 0}
-                                            >
-                                                <option value="" disabled>{loadingTerr && selectedDeptId ? 'Chargement…' : 'Sélectionner…'}</option>
-                                                {communes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                                            </select>
-                                            <input type="hidden" {...register('commune')} />
+                                            <input id="commune" className={inputCls} aria-invalid={!!errors.commune}
+                                                placeholder="ex : Cotonou" {...register('commune')} />
                                         </Field>
-
                                         <Field label="Arrondissement" error={errors.arrondissement?.message} htmlFor="arrondissement">
-                                            <select
-                                                id="arrondissement"
-                                                className={selectCls}
-                                                aria-invalid={!!errors.arrondissement}
-                                                value={selectedArrondId ?? ''}
-                                                onChange={(e) => handleArrondChange(e.target.value)}
-                                                disabled={arrondissements.length === 0}
-                                            >
-                                                <option value="" disabled>{loadingTerr && selectedCommuneId ? 'Chargement…' : 'Sélectionner…'}</option>
-                                                {arrondissements.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-                                            </select>
-                                            <input type="hidden" {...register('arrondissement')} />
+                                            <input id="arrondissement" className={inputCls} aria-invalid={!!errors.arrondissement}
+                                                placeholder="ex : Akpakpa" {...register('arrondissement')} />
                                         </Field>
-
-                                        <Field label="Quartier / Village" error={errors.quartier?.message} htmlFor="quartier">
-                                            <select
-                                                id="quartier"
-                                                className={selectCls}
-                                                aria-invalid={!!errors.quartier}
-                                                value=""
-                                                onChange={(e) => handleQuartierChange(e.target.value)}
-                                                disabled={quartiers.length === 0}
-                                            >
-                                                <option value="" disabled>{loadingTerr && selectedArrondId ? 'Chargement…' : 'Sélectionner…'}</option>
-                                                {quartiers.map((q) => <option key={q.id} value={q.id}>{q.label}</option>)}
-                                            </select>
-                                            <input type="hidden" {...register('quartier')} />
+                                        <Field label="Quartier" error={errors.quartier?.message} htmlFor="quartier">
+                                            <input id="quartier" className={inputCls} aria-invalid={!!errors.quartier}
+                                                placeholder="ex : Agla" {...register('quartier')} />
                                         </Field>
                                     </div>
                                 </fieldset>
                             </Step>
 
-                            {/* ── Step 4: Parcelle ─────────────────────────────────── */}
+                            {/* 4 — Parcelle */}
                             <Step>
                                 <fieldset className="space-y-5">
                                     <legend className="mb-4 text-xl font-semibold">Détails de la parcelle</legend>
@@ -554,26 +462,29 @@ export default function DossierForm() {
                                     <Field label="Origine du droit" error={errors.origine_droit?.message} htmlFor="origine">
                                         <select id="origine" className={selectCls} aria-invalid={!!errors.origine_droit} defaultValue="" {...register('origine_droit')}>
                                             <option value="" disabled>Sélectionner…</option>
-                                            {ORIGINES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                            {ORIGINES.map((o) => (
+                                                <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
                                         </select>
                                     </Field>
+
                                     {warnings.length > 0 && (
                                         <div className="rounded-xl border border-gandehou-yellow/40 bg-gandehou-yellow/15 p-4" role="status">
                                             <p className="mb-1 text-sm font-semibold text-amber-900 dark:text-gandehou-yellow">À noter</p>
                                             <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90 dark:text-gandehou-yellow/90">
-                                                {warnings.map((w) => <li key={w}>{w}</li>)}
+                                                {warnings.map((w) => (<li key={w}>{w}</li>))}
                                             </ul>
                                         </div>
                                     )}
                                 </fieldset>
                             </Step>
 
-                            {/* ── Step 5: Voisinage ────────────────────────────────── */}
+                            {/* 5 — Voisinage */}
                             <Step>
                                 <fieldset className="space-y-5">
                                     <legend className="mb-4 text-xl font-semibold">Limites de voisinage</legend>
                                     <p className="text-sm text-neutral-900/60 dark:text-white/60">
-                                        Noms des propriétaires ou occupants des parcelles adjacentes.
+                                        Indiquez les noms des propriétaires ou occupants des parcelles adjacentes.
                                     </p>
                                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                                         <Field label="Au Nord" error={errors.voisin_nord?.message} htmlFor="v_n">
@@ -688,47 +599,6 @@ export default function DossierForm() {
 /* ------------------------------------------------------------------ *
  * Sub-components
  * ------------------------------------------------------------------ */
-function PiTypeSelector({
-    name,
-    register,
-    current,
-}: {
-    name: 'vendeur_pi_type' | 'acheteur_pi_type'
-    register: any
-    current?: PiType
-}) {
-    return (
-        <div>
-            <p className="mb-2 block text-sm font-medium text-neutral-900/80 dark:text-white/80">
-                Type de pièce d'identité
-            </p>
-            <div className="flex gap-3">
-                {([
-                    { value: 'carte_identite', label: "Carte d'identité (CIP)" },
-                    { value: 'passeport', label: 'Passeport' },
-                ] as const).map((opt) => (
-                    <label
-                        key={opt.value}
-                        className={`flex flex-1 cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-medium transition
-              ${current === opt.value
-                                ? 'border-gandehou-green bg-gandehou-green/10 text-gandehou-green dark:bg-gandehou-green/15'
-                                : 'border-black/10 dark:border-white/15'}
-              has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-gandehou-green/20`}
-                    >
-                        <input
-                            type="radio"
-                            value={opt.value}
-                            className="sr-only"
-                            {...register(name)}
-                        />
-                        {opt.label}
-                    </label>
-                ))}
-            </div>
-        </div>
-    )
-}
-
 function Field({ label, error, htmlFor, children }: { label: string; error?: string; htmlFor?: string; children: React.ReactNode }) {
     return (
         <div className="text-left">
@@ -739,8 +609,9 @@ function Field({ label, error, htmlFor, children }: { label: string; error?: str
     )
 }
 
-function FilePick({ id, label, hint, accept, multiple = false, required = false, files, onFiles }: { id: string; label: string; hint: string; accept: string; multiple?: boolean; required?: boolean; files: File[]; onFiles: (files: File[]) => void }) {
+function FilePick({ id, label, hint, accept, multiple = false, files, onFiles }: { id: string; label: string; hint: string; accept: string; multiple?: boolean; files: File[]; onFiles: (files: File[]) => void }) {
     const inputRef = useRef<HTMLInputElement>(null)
+
     const handleFiles = (incoming: File[]) => {
         // Sur mobile iOS/Android, certains fichiers arrivent sans MIME (chaine vide).
         // On accepte aussi via l'extension du nom pour ne pas les filtrer a tort.
@@ -763,12 +634,10 @@ function FilePick({ id, label, hint, accept, multiple = false, required = false,
 
     return (
         <div className="text-left">
-            <p className="mb-1.5 text-sm font-medium text-neutral-900/80 dark:text-white/80">
-                {label}{required && <span className="ml-1 text-gandehou-red">*</span>}
-            </p>
-            <button type="button" onClick={() => inputRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/20 bg-black/[0.02] px-4 py-6 text-center outline-none transition hover:border-gandehou-green hover:bg-gandehou-green/5 focus-visible:ring-4 focus-visible:ring-gandehou-green/20 dark:border-white/20 dark:bg-white/[0.03] dark:hover:bg-gandehou-green/10">
-                <Upload className="h-5 w-5 text-gandehou-green" />
-                <span className="text-sm text-neutral-900/70 dark:text-white/70">Photo ou fichier</span>
+            <p className="mb-1.5 text-sm font-medium text-neutral-900/80 dark:text-white/80">{label}</p>
+            <button type="button" onClick={() => inputRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/20 bg-black/[0.02] px-4 py-8 text-center outline-none transition hover:border-gandehou-green hover:bg-gandehou-green/5 focus-visible:ring-4 focus-visible:ring-gandehou-green/20 dark:border-white/20 dark:bg-white/[0.03] dark:hover:bg-gandehou-green/10">
+                <Upload className="h-6 w-6 text-gandehou-green" />
+                <span className="text-sm text-neutral-900/70 dark:text-white/70">Prendre une photo ou choisir un fichier</span>
                 <span className="text-xs text-neutral-900/45 dark:text-white/45">{hint}</span>
             </button>
             <input ref={inputRef} id={id} type="file" accept={accept} multiple={multiple} className="sr-only"
@@ -814,7 +683,8 @@ function DossierSuccess({ id: _id, phone }: { id: string; phone: string }) {
             </Link>
 
             <p className="mt-6 text-xs leading-relaxed text-neutral-900/50 dark:text-white/50">
-                Document provisoire — sans valeur de titre de propriété.
+                Document en attente — sans valeur de titre de propriété. Gandehou sécurise la preuve
+                d'antériorité et d'intégrité, en amont du circuit légal (Notaire / ANDF).
             </p>
         </div>
     )
