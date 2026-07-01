@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    --k-bg: 255 255 255;
+    --k-bg: #f8f7e7;
     --k-surface: 255 255 255;
     --k-surface-2: 244 244 245;
     --k-border: 228 228 231;
@@ -36,7 +36,8 @@
     --k-info: 59 130 246;
   }
 
-  html, body {
+  html,
+  body {
     background: rgb(var(--k-bg));
     color: rgb(var(--k-text));
     font-family: "Work Sans", sans-serif;
@@ -46,14 +47,31 @@
     scroll-behavior: smooth;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: "Work Sans", sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.15;
   }
 
-  a{
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* Internet Explorer and Edge */
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, and Opera */
+  }
+
+  a {
     cursor: pointer;
   }
 
@@ -68,7 +86,9 @@
     border-radius: 4px;
   }
 
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-size: 16px;
   }
 }
@@ -94,22 +114,11 @@
     text-underline-offset: 0.12em;
   }
 
-  .grid-bg {
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(to right, rgb(var(--k-border)) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(var(--k-border)) 1px, transparent 1px);
-    background-size: 64px 64px;
-    mask-image: radial-gradient(ellipse 60% 40% at 50% 30%, #000 30%, transparent 75%);
-    -webkit-mask-image: radial-gradient(ellipse 60% 40% at 50% 30%, #000 30%, transparent 75%);
-    pointer-events: none;
-    opacity: 0.5;
-  }
 
   .badge-state {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-2 border border-border text-text;
   }
+
   .badge-state::before {
     content: "";
     width: 6px;
@@ -117,7 +126,16 @@
     border-radius: 50%;
     background: rgb(var(--k-muted));
   }
-  .badge-state.state-ok::before     { background: rgb(var(--k-accent)); }
-  .badge-state.state-warn::before   { background: rgb(var(--k-warn)); }
-  .badge-state.state-danger::before { background: rgb(var(--k-danger)); }
+
+  .badge-state.state-ok::before {
+    background: rgb(var(--k-accent));
+  }
+
+  .badge-state.state-warn::before {
+    background: rgb(var(--k-warn));
+  }
+
+  .badge-state.state-danger::before {
+    background: rgb(var(--k-danger));
+  }
 }

@@ -30,7 +30,7 @@ const heroImages = [img1, img2, img3, img4, img5];
 
 export default function Landing() {
   return (
-    <>
+    <div className="bg-gandehou-paper dark:bg-black">
       <Hero />
       <Features />
       <HowItWorks />
@@ -38,7 +38,7 @@ export default function Landing() {
       <FAQ />
       <FinalCta />
       <Footer />
-    </>
+    </div>
   );
 }
 
@@ -57,6 +57,7 @@ function Hero() {
           relative origin-top
           w-full min-h-screen
           md:w-[98vw] md:min-h-[98vh] md:rounded-[30px]
+          bg-white dark:bg-black
         "
       >
         {/* Background pattern */}
