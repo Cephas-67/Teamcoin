@@ -213,12 +213,10 @@ export default function DossierForm() {
                 .insert({
                     statut: 'soumis',
                     vendeur_nom: v.vendeur_nom,
-                    vendeur_cip: v.vendeur_cip,          // legacy · a supprimer post-migration
                     vendeur_id_type: vendeurIdType,      // 'cip' | 'passeport'
-                    vendeur_id_value: v.vendeur_cip,
+                    vendeur_id_value: v.vendeur_cip,     // le champ du form s'appelle _cip mais contient l'id (CIP ou passeport)
                     vendeur_phone: v.vendeur_phone,
                     acheteur_nom: v.acheteur_nom,
-                    acheteur_cip: v.acheteur_cip,        // legacy
                     acheteur_id_type: acheteurIdType,
                     acheteur_id_value: v.acheteur_cip,
                     acheteur_phone: v.acheteur_phone,

@@ -32,8 +32,14 @@ import { cn } from '@/lib/cn'
 type Dossier = {
     id: string
     statut: 'brouillon' | 'soumis' | 'atteste_cq' | 'valide_mairie' | 'litige'
-    vendeur_nom: string; vendeur_cip: string | null; vendeur_phone: string | null
-    acheteur_nom: string; acheteur_cip: string | null; acheteur_phone: string | null
+    vendeur_nom: string
+    vendeur_id_type: 'cip' | 'passeport' | null
+    vendeur_id_value: string | null
+    vendeur_phone: string | null
+    acheteur_nom: string
+    acheteur_id_type: 'cip' | 'passeport' | null
+    acheteur_id_value: string | null
+    acheteur_phone: string | null
     acheteur_nationalite: string | null
     departement: string | null; commune: string | null
     arrondissement: string | null; quartier: string | null
@@ -286,14 +292,24 @@ export default function DossierReview() {
                 <div className="space-y-4">
                     <Section title="Vendeur">
                         <Row label="Noms et prénoms" value={dossier.vendeur_nom} />
-                        {dossier.vendeur_cip && <Row label="CIP / Passeport" value={dossier.vendeur_cip} />}
+                        {dossier.vendeur_id_value && (
+                            <Row
+                                label={dossier.vendeur_id_type === 'passeport' ? 'Passeport' : 'CIP'}
+                                value={dossier.vendeur_id_value}
+                            />
+                        )}
                         {dossier.vendeur_phone && <Row label="Téléphone" value={dossier.vendeur_phone} />}
                     </Section>
 
                     <Section title="Acheteur">
                         <Row label="Noms et prénoms" value={dossier.acheteur_nom} />
                         {dossier.acheteur_nationalite && <Row label="Nationalité" value={dossier.acheteur_nationalite} />}
-                        {dossier.acheteur_cip && <Row label="CIP / Passeport" value={dossier.acheteur_cip} />}
+                        {dossier.acheteur_id_value && (
+                            <Row
+                                label={dossier.acheteur_id_type === 'passeport' ? 'Passeport' : 'CIP'}
+                                value={dossier.acheteur_id_value}
+                            />
+                        )}
                         {dossier.acheteur_phone && <Row label="Téléphone" value={dossier.acheteur_phone} />}
                     </Section>
 
