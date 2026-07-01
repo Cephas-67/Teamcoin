@@ -12,19 +12,20 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from '@/auth/AuthProvider'
 import { RedirectIfAuthed, RequireAuth } from '@/auth/RouteGuards'
+import CqPortal from './pages/cq/CqPortal'
 
 /* ── Lazy page imports ─────────────────────────────────────────────── */
-const Landing             = lazy(() => import('@/pages/Landing'))
-const Onboarding          = lazy(() => import('@/pages/Onboarding'))
-const Connexion           = lazy(() => import('@/pages/Connexion'))
-const CitizenPortal       = lazy(() => import('@/pages/citizen/CitizenPortal'))
-const DossierForm         = lazy(() => import('@/pages/citizen/DossierForm'))
-const VerificationPortal  = lazy(() => import('@/pages/citizen/VerificationPortal'))
-const DossierTwin         = lazy(() => import('@/pages/citizen/DossierTwin'))
-const CqDashboard         = lazy(() => import('@/pages/cq/CqDashboard'))
-const DossierReview       = lazy(() => import('@/pages/cq/DossierReview'))
-const MairieDashboard     = lazy(() => import('@/pages/mairie/MairieDashboard'))
-const DossierValidation   = lazy(() => import('@/pages/mairie/DossierValidation'))
+const Landing = lazy(() => import('@/pages/Landing'))
+const Onboarding = lazy(() => import('@/pages/Onboarding'))
+const Connexion = lazy(() => import('@/pages/Connexion'))
+const CitizenPortal = lazy(() => import('@/pages/citizen/CitizenPortal'))
+const DossierForm = lazy(() => import('@/pages/citizen/DossierForm'))
+const VerificationPortal = lazy(() => import('@/pages/citizen/VerificationPortal'))
+const DossierTwin = lazy(() => import('@/pages/citizen/DossierTwin'))
+const CqDashboard = lazy(() => import('@/pages/cq/CqDashboard'))
+const DossierReview = lazy(() => import('@/pages/cq/DossierReview'))
+const MairieDashboard = lazy(() => import('@/pages/mairie/MairieDashboard'))
+const DossierValidation = lazy(() => import('@/pages/mairie/DossierValidation'))
 
 /* ── Loading fallback ──────────────────────────────────────────────── */
 function PageLoader() {
@@ -85,8 +86,8 @@ export default function App() {
           <Route path="/" element={<Landing />} />
 
           {/* Smart dashboard redirect */}
-          <Route path="/dashboard" element={<SmartDashboard />} />
-          {/* <Route path="/dashboard" element={<CqDashboard />} /> */}
+          {/* <Route path="/dashboard" element={<SmartDashboard />} /> */}
+          <Route path="/dashboard" element={<MairieDashboard />} />
 
           {/* Skip if already authed */}
           <Route element={<RedirectIfAuthed redirectTo="/dashboard" />}>
@@ -102,6 +103,7 @@ export default function App() {
 
           {/* Chef de Quartier */}
           <Route element={<RequireAuth role="chef_quartier" />}>
+            <Route path="/cq-portal" element={<CqPortal />} />
             <Route path="/cq/dashboard" element={<CqDashboard />} />
             <Route path="/cq/dossier/:id" element={<DossierReview />} />
           </Route>

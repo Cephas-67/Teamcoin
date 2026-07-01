@@ -1,12 +1,11 @@
-// 5 étapes de la notarisation KandoFoncier.
-// Structure miroir de GemmaS HowItWorks (sticky scroll + crossfade).
 import {
   ClipboardList,
-  Mic,
-  Fingerprint,
+  UserCheck,
+  FileText,
+  Landmark,
   Bitcoin,
-  ShieldCheck,
   type LucideIcon,
+  Check,
 } from "lucide-react";
 
 export type HowStep = {
@@ -14,48 +13,48 @@ export type HowStep = {
   label: string;
   description: string;
   icon: LucideIcon;
-  tone: string; // couleur de fond illustrative
+  tone: string;
 };
 
 export const howSteps: HowStep[] = [
   {
     n: "01.",
-    label: "Référencer la parcelle",
+    label: "Renseigner les informations",
     description:
-      "L'agent foncier saisit la référence cadastrale, la ville, les noms du vendeur et de l'acheteur.",
+      "Le citoyen remplit un formulaire guidé depuis son smartphone : identité vendeur/acheteur, localisation de la parcelle, limites de voisinage et pièces justificatives.",
     icon: ClipboardList,
     tone: "from-[#2a2233] to-[#3a3540]",
   },
   {
     n: "02.",
-    label: "Enregistrer le consentement",
+    label: "Validation par le Chef de Quartier",
     description:
-      "La cliente parle dans sa langue locale (Fon, Yoruba, Adja). L'audio devient une preuve d'intention.",
-    icon: Mic,
+      "Le Chef de Quartier vérifie les noms des voisins déclarés sur le terrain et confirme le bon voisinage par signature OTP (code SMS).",
+    icon: UserCheck,
     tone: "from-[#352f2a] to-[#4a3f30]",
   },
   {
     n: "03.",
-    label: "Capturer la signature",
+    label: "Attestation générée, scellée et envoyée",
     description:
-      "L'empreinte digitale débloque une clé cryptographique gérée par l'enclave sécurisée du smartphone.",
-    icon: Fingerprint,
+      "Une attestation provisoire est générée avec un QR code unique. Son empreinte SHA-256 est calculée et ancrée sur Bitcoin via OpenTimestamps.",
+    icon: FileText,
     tone: "from-[#2a323a] to-[#34424f]",
   },
   {
     n: "04.",
-    label: "Sceller sur Bitcoin",
+    label: "Vérification et validation par le Notaire",
     description:
-      "Le hash SHA-256 du couple (document + audio) est ancré dans la blockchain via OpenTimestamps.",
-    icon: Bitcoin,
+      "L'agent Mairie ou le notaire contrôle le dossier complet, approuve la transaction et déclenche la génération de la convention finale chaînée au document provisoire.",
+    icon: Landmark,
     tone: "from-[#3a2f1f] to-[#4f3a1f]",
   },
   {
     n: "05.",
-    label: "Vérifier à tout moment",
+    label: "Convention de Vente Notarisée scellée",
     description:
-      "N'importe qui peut recharger le document. Un seul octet modifié rend la preuve invalide.",
-    icon: ShieldCheck,
+      "La convention finale est ancrée sur un systeme decentralise. N'importe qui peut scanner le QR code ou glisser le PDF pour vérifier instantanément son authenticité.",
+    icon: Check,
     tone: "from-[#1f3a2a] to-[#1f4f30]",
   },
 ];

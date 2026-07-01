@@ -188,7 +188,7 @@ function VerdictPanel({ status, fileName, onReset }: { status: Verdict; fileName
       {status === 'authentic' && (
         <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-gandehou-green px-4 py-2 text-sm font-semibold text-white">
           <Bitcoin className="h-4 w-4" />
-          Intégrité ancrée sur Bitcoin
+          Intégrité ancrée
         </span>
       )}
 

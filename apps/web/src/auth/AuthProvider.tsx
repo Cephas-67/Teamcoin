@@ -9,14 +9,12 @@ import {
 import { getCurrentChef, logout as authLogout, type Chef } from '@/services/auth'
 import { supabase } from '@/lib/supabase'
 
-// Role values match the profiles.role check constraint (spec p.14).
 export type Role = 'chef_quartier' | 'agent_mairie' | 'admin' | null
 
 type AuthState = {
   chef: Chef | null
   role: Role
   loading: boolean
-  /** Re-read session + role. Call after loginWithPhoneDemo (no Supabase event fires). */
   refresh: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -40,13 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     const c = await getCurrentChef()
     setChef(c)
-    if (c?.source === 'email' && c.id) {
+    // Always fetch the real role from profiles, regardless of auth source.
+    // No more hardcoded demo roles.
+    if (c?.id) {
       setRole(await fetchRole(c.id))
-    } else if (c?.source === 'phone-demo') {
-      // Phone-demo n'a pas de profil Supabase (login purement local).
-      // On lui assigne chef_quartier par defaut pour la demo, sinon
-      // SmartDashboard bloque sur "Compte en attente de configuration".
-      setRole('chef_quartier')
     } else {
       setRole(null)
     }
@@ -63,8 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false)
     })
 
-    // React to email-auth events: magic-link, sign-out, token refresh.
-    // Phone-demo doesn't emit these — call refresh() after loginWithPhoneDemo.
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       if (active) load()
     })

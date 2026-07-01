@@ -32,8 +32,8 @@ export default function Connexion() {
   // On le mappe vers les valeurs du schema (profiles.role check constraint).
   const roleFromOnboarding: SignupRole | undefined =
     state?.role === 'chef-quartier' ? 'chef_quartier'
-    : state?.role === 'agent' ? 'agent_mairie'
-    : undefined
+      : state?.role === 'agent' ? 'agent_mairie'
+        : undefined
 
   const [method, setMethod] = useState<Method>('email')
   const [step, setStep] = useState<Step>('input')
@@ -130,7 +130,7 @@ export default function Connexion() {
           <button
             type="button"
             onClick={() => { setStep('input'); setOtp(''); setError('') }}
-            className="inline-flex items-center gap-2 text-sm text-neutral-900/60 outline-none transition-colors hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:text-white/60 dark:hover:text-white"
+            className="flex items-center gap-2 rounded-full md:rounded-2xl bg-gandehou-green/10 p-3 md:px-5 md:py-3 font-medium text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/15 focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:bg-gandehou-green/15 dark:hover:bg-gandehou-green/25"
           >
             <ArrowLeft className="h-4 w-4" />
             Modifier
@@ -209,7 +209,7 @@ export default function Connexion() {
               <div className="mb-5 rounded-xl border border-gandehou-yellow/40 bg-gandehou-yellow/15 p-3 text-xs leading-relaxed text-amber-900 dark:text-gandehou-yellow">
                 <strong>2 façons de se connecter :</strong><br />
                 · <strong>Clique le lien "Sign in"</strong> dans l'email · vous etes redirigé connecté.<br />
-                · OU entre les <strong>6 chiffres</strong> ci-dessous (si SMTP custom configuré).
+                · OU entre les <strong>6 chiffres</strong> ci-dessous.
               </div>
               {error && <ErrorBox>{error}</ErrorBox>}
               <OTPInput value={otp} onChange={(v) => { setOtp(v); if (error) setError('') }} />
@@ -275,7 +275,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gandehou-green ${active
         ? 'bg-white text-gandehou-green shadow-sm dark:bg-white/10 dark:text-gandehou-green'
         : 'text-neutral-900/50 hover:text-neutral-900 dark:text-white/50 dark:hover:text-white'
-      }`}
+        }`}
     >
       {children}
     </button>

@@ -23,7 +23,7 @@ export function BackButton({ fallback = "/", label = "Retour" }: Props) {
     <button
       type="button"
       onClick={goBack}
-      className="inline-flex items-center gap-2 text-sm text-muted hover:text-text transition-colors"
+      className="flex items-center justify-center gap-2 rounded-2xl bg-gandehou-green px-8 py-3.5 text-lg font-medium text-white transition-colors duration-300 hover:bg-gandehou-green/90"
     >
       <ArrowLeft className="w-4 h-4" />
       <span className="hidden md:flex">{label}</span>

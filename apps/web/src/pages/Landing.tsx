@@ -264,12 +264,12 @@ function Features() {
 
 function FinalCta() {
   return (
-    <section className="py-20 lg:py-28">
+    <section className="py-20">
       <div className="container text-center max-w-2xl">
         <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight">
           Prêt à sceller votre première transaction foncière ?
         </h2>
-        <Link to="/citizen-portal"
+        <Link to="/onboarding"
           className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
         >
           Commencer maintenant

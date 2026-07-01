@@ -17,7 +17,7 @@ export default function HeroNav() {
     return (
         <>
             {/* ── Fixed top bar ──────────────────────────────────────────── */}
-            <div className="fixed left-0 top-0 z-40 flex w-full items-center justify-between p-4 sm:p-6 md:p-10 backdrop-blur-lg md:backdrop-blur-none">
+            <div className="fixed left-0 top-0 z-40 flex w-full items-center justify-between p-4 sm:p-6 md:p-8 backdrop-blur-lg border border-b-2 border-black/10 dark:border-white/30">
                 {/* Logo */}
                 <Link to="/" aria-label="Gandehou — Accueil">
                     <img

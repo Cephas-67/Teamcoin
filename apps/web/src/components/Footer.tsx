@@ -186,11 +186,6 @@ export function Footer() {
           </ul>
         </div>
       </div>
-
-      {/* Wordmark torche collé en bas */}
-      <div className="px-4 sm:px-6 lg:px-10">
-        <TorchWordmark />
-      </div>
     </footer>
   );
 }
