@@ -200,16 +200,27 @@ export default function DossierForm() {
 
         const v = getValues()
         setSubmitting(true)
+
+        // Auto-detection CIP vs passeport (13 chiffres = CIP beninois)
+        const detectIdType = (val: string): 'cip' | 'passeport' =>
+            /^\d{13}$/.test(val.trim()) ? 'cip' : 'passeport'
+        const vendeurIdType = detectIdType(v.vendeur_cip)
+        const acheteurIdType = detectIdType(v.acheteur_cip)
+
         try {
             const { data, error } = await supabase
                 .from('dossiers')
                 .insert({
                     statut: 'soumis',
                     vendeur_nom: v.vendeur_nom,
-                    vendeur_cip: v.vendeur_cip,
+                    vendeur_cip: v.vendeur_cip,          // legacy · a supprimer post-migration
+                    vendeur_id_type: vendeurIdType,      // 'cip' | 'passeport'
+                    vendeur_id_value: v.vendeur_cip,
                     vendeur_phone: v.vendeur_phone,
                     acheteur_nom: v.acheteur_nom,
-                    acheteur_cip: v.acheteur_cip,
+                    acheteur_cip: v.acheteur_cip,        // legacy
+                    acheteur_id_type: acheteurIdType,
+                    acheteur_id_value: v.acheteur_cip,
                     acheteur_phone: v.acheteur_phone,
                     acheteur_nationalite: v.acheteur_nationalite,
                     departement: v.departement,
