@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Variants } from 'framer-motion'
-import logo from '@/assets/logo.svg'
+import logo from '../public/logo.svg'
 
 const ROUTES = {
   citoyenSpace: '/citizen-portal',

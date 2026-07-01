@@ -9,7 +9,7 @@ import { PhoneInput } from '@/components/PhoneInput'
 import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo } from '@/services/auth'
 import { countries, formatPhone } from '@/data/countries'
 import { useAuth } from '@/auth/AuthProvider'
-import logo from '@/assets/logo.svg'
+import logo from '../public/logo.svg'
 
 function formatE164(e164: string): string {
   const c = countries.find((x) => e164.startsWith(x.dial))

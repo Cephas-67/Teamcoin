@@ -5,7 +5,8 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { StatusChip } from '@/components/StatusChip'
 import { useAuth } from '@/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
-import logo from '@/assets/logo.svg'
+import logo from '../../public/logo.svg'
+import { LogoutModal } from '@/components/LogoutModal'
 
 // Mirrors the dossiers table (spec p.14). Only the fields the dashboard needs.
 type DossierRow = {
@@ -22,7 +23,7 @@ type DossierRow = {
 }
 
 export default function CqDashboard() {
-  const { chef, logout } = useAuth()
+  const { chef } = useAuth()
   const [dossiers, setDossiers] = useState<DossierRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -63,19 +64,11 @@ export default function CqDashboard() {
         </Link>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={logout}
-            aria-label="Se déconnecter"
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-neutral-900/60 outline-none transition-colors hover:bg-black/5 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
+          <LogoutModal />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-xl px-4 pb-20 pt-8">
+      <main className="mx-auto w-full max-w-4xl px-4 pb-20 pt-8">
         {/* ── Greeting ────────────────────────────────────────────── */}
         <div className="mb-6">
           <p className="text-sm font-medium text-gandehou-green">Espace Chef de Quartier</p>
@@ -84,6 +77,13 @@ export default function CqDashboard() {
             Dossiers en attente de votre attestation de voisinage.
           </p>
         </div>
+
+        <Link
+          to="/citizen-portal"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-gandehou-green px-8 py-3.5 text-lg font-medium text-white transition-colors duration-300 hover:bg-gandehou-green/90"
+        >
+          Lancer une transaction
+        </Link>
 
         {/* ── Action bar ──────────────────────────────────────────── */}
         <div className="mb-5 flex items-center justify-between">

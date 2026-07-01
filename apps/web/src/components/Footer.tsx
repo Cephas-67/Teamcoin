@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Instagram, Linkedin, Mail, Twitter } from "lucide-react";
 import { cn } from "../lib/cn";
 import bg from "../assets/images/bg.svg"
-import logo from "../assets/logo.svg"; // TODO(path): adjust if Footer.tsx isn't one level under assets/
+import logo from "../public/logo.svg"; // TODO(path): adjust if Footer.tsx isn't one level under assets/
 
 type FooterCol = { heading: string; links: { label: string; href: string }[] };
 
@@ -40,7 +40,7 @@ const LEGAL = [
 ];
 
 const SOCIALS = [
-  { label: "GitHub", href: "#", icon: Github },
+  { label: "Instagram", href: "#", icon: Instagram },
   { label: "Twitter", href: "#", icon: Twitter },
   { label: "LinkedIn", href: "#", icon: Linkedin },
   { label: "Email", href: "mailto:contact@gandehou.bj", icon: Mail },

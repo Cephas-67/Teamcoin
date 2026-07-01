@@ -26,7 +26,7 @@ export function BackButton({ fallback = "/", label = "Retour" }: Props) {
       className="inline-flex items-center gap-2 text-sm text-muted hover:text-text transition-colors"
     >
       <ArrowLeft className="w-4 h-4" />
-      <span>{label}</span>
+      <span className="hidden md:flex">{label}</span>
     </button>
   );
 }

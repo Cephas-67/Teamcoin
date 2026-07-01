@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import logo from '@/assets/logo.svg'
+import logo from '../public/logo.svg'
 
 type PortalNavProps = {
   /** Where the Retour button goes. Defaults to home. */
@@ -27,10 +27,10 @@ export function PortalNav({ backTo = '/', backLabel = 'Retour' }: PortalNavProps
             e.preventDefault();
             backTo && navigate(-1);
           }}
-          className="flex items-center gap-2 rounded-2xl bg-gandehou-green/10 px-5 py-3 font-medium text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/15 focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:bg-gandehou-green/15 dark:hover:bg-gandehou-green/25"
+          className="flex items-center gap-2 rounded-full md:rounded-2xl bg-gandehou-green/10 p-3 md:px-5 md:py-3 font-medium text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/15 focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:bg-gandehou-green/15 dark:hover:bg-gandehou-green/25"
         >
-          <ArrowLeft className="h-5 w-5" />
-          {backLabel}
+          <ArrowLeft className="h-7 w-7" />
+          <span className='hidden md:flex'>{backLabel}</span>
         </Link>
         <ThemeToggle />
       </div>

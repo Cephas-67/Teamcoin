@@ -21,6 +21,7 @@ import img2 from "@/assets/images/img2.webp";
 import img3 from "@/assets/images/img3.webp";
 import img4 from "@/assets/images/img4.webp";
 import img5 from "@/assets/images/img5.webp";
+import logo from '../public/logo.svg'
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
@@ -34,7 +35,7 @@ export default function Landing() {
       <Hero />
       <Features />
       <HowItWorks />
-      <Stack />
+      {/* <Stack /> */}
       <FAQ />
       <FinalCta />
       <Footer />
@@ -71,12 +72,16 @@ function Hero() {
         <div className="relative flex flex-col items-center justify-center h-screen px-5 pb-12 pt-16 md:px-8 md:pb-16 md:pt-24">
           <h1 className="text-3xl sm:text-4xl md:text-6xl text-center font-semibold max-w-4xl">
             Sécurisez chaque transaction foncière grâce à{" "}
-            <span className="text-gandehou-green">Gandéhou</span>
+            <span className="text-gandehou-green"><img
+              src={logo}
+              alt="Gandehou"
+              className="h-[28px] w-auto inline sm:h-[32px] md:h-[52px] aspect-auto"
+            /></span>
           </h1>
 
           <p className="mt-4 max-w-2xl px-2 text-center text-sm sm:text-base text-neutral-900/70 dark:text-white/70">
             La confiance devient vérifiable. Des documents fonciers sécurisés,
-            traçables et vérifiables grâce aux principes de sécurité de Bitcoin.
+            traçables et vérifiables grâce à un réseau decentralisé.
           </p>
 
           {/* CTAs — stack on small screens, row on larger */}
@@ -120,7 +125,7 @@ function Hero() {
               w-full max-w-4xl mx-auto pb-4
               overflow-x-auto snap-x snap-mandatory
               px-4 md:px-0
-              scrollbar-none
+              scrollbar-none flex-row items-center justify-center
             "
           >
             {heroImages.map((src, i) => (
@@ -133,7 +138,7 @@ function Hero() {
                 loading={i === 0 ? "eager" : "lazy"}
                 decoding="async"
                 className="
-                  w-28 h-36 sm:w-36 sm:h-44
+                  max-w-36 max-h-44 aspect-[3/4] h-full w-auto
                   rounded-lg object-cover flex-shrink-0
                   snap-center
                   hover:-translate-y-1 transition duration-300
@@ -156,28 +161,10 @@ function Features() {
         "La cliente s'enregistre dans sa langue (Fon, Yoruba, Adja, Mina). Aucune dépendance à la lecture ou à l'écrit.",
     },
     {
-      Icon: Fingerprint,
-      title: "Signature biométrique",
-      description:
-        "Empreinte sur l'écran du smartphone via WebAuthn/Passkey. Clé cryptographique gérée par l'enclave sécurisée.",
-    },
-    {
-      Icon: LinkIcon,
-      title: "Ancrage Bitcoin",
-      description:
-        "Hash SHA-256 du couple (contrat + audio) scellé via OpenTimestamps. Coût réseau : zéro FCFA.",
-    },
-    {
       Icon: ShieldAlert,
       title: "Détection de fraude",
       description:
         "Tout document modifié d'un seul octet est rejeté instantanément. La preuve originale reste opposable.",
-    },
-    {
-      Icon: Eye,
-      title: "Explorer public",
-      description:
-        "Liste de tous les actes notarisés. N'importe quel acquéreur peut vérifier l'historique d'une parcelle.",
     },
     {
       Icon: Languages,
@@ -185,12 +172,7 @@ function Features() {
       description:
         "Pas d'interface bardée de texte juridique. Les enregistrements oraux portent l'intention, le code porte la preuve.",
     },
-    {
-      Icon: FileSearch,
-      title: "Vérification universelle",
-      description:
-        "Le hash recomputé localement vous dit en moins de deux secondes si un document est authentique ou modifié.",
-    },
+
   ];
 
   return (
@@ -229,68 +211,64 @@ function Features() {
   );
 }
 
-function Stack() {
-  const items = [
-    { Icon: Bitcoin, name: "OpenTimestamps", sub: "Ancrage Bitcoin sans frais" },
-    { Icon: Database, name: "Supabase Postgres", sub: "Ledger des actes" },
-    { Icon: Code2, name: "Express · Node 20", sub: "API + hashing serveur" },
-    { Icon: Layout, name: "React · Vite · Tailwind", sub: "UI mobile-first" },
-  ];
+// function Stack() {
+//   const items = [
+//     { Icon: Bitcoin, name: "OpenTimestamps", sub: "Ancrage Bitcoin sans frais" },
+//     { Icon: Database, name: "Supabase Postgres", sub: "Ledger des actes" },
+//     { Icon: Code2, name: "Express · Node 20", sub: "API + hashing serveur" },
+//     { Icon: Layout, name: "React · Vite · Tailwind", sub: "UI mobile-first" },
+//   ];
 
-  return (
-    <section id="stack" className="w-full py-20 lg:py-28">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[36px] border border-border/60 bg-gradient-to-b from-white/60 to-white/30 dark:from-black/40 dark:to-black/60 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_30px_80px_-30px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.07),0_40px_100px_-30px_rgba(0,0,0,0.6)]">
-          {/* Glows ambiants */}
-          <div className="pointer-events-none absolute -top-28 -left-28 h-80 w-80 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-blue)/0.18),transparent_70%)]" />
-          <div className="pointer-events-none absolute -bottom-24 -right-28 h-96 w-96 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-orange)/0.16),transparent_70%)]" />
+//   return (
+//     <section id="stack" className="w-full py-20 lg:py-28">
+//       <div className="container mx-auto px-4 md:px-6">
+//         <div className="group relative mx-auto max-w-[960px] overflow-hidden rounded-[36px] border border-border/60 bg-gradient-to-b from-white/60 to-white/30 dark:from-black/40 dark:to-black/60 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_30px_80px_-30px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.07),0_40px_100px_-30px_rgba(0,0,0,0.6)]">
+//           {/* Glows ambiants */}
+//           <div className="pointer-events-none absolute -top-28 -left-28 h-80 w-80 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-blue)/0.18),transparent_70%)]" />
+//           <div className="pointer-events-none absolute -bottom-24 -right-28 h-96 w-96 rounded-full blur-3xl bg-[radial-gradient(closest-side,hsl(var(--brand-orange)/0.16),transparent_70%)]" />
 
-          <div className="relative p-10 md:p-14 lg:p-16">
-            <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Une stack pensée pour durer trente ans.
-              </h2>
-              <p className="mt-5 text-base md:text-lg leading-relaxed text-muted">
-                Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
-                Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
-                les preuves restent décodables par n'importe quel outil open-source.
-              </p>
-            </div>
+//           <div className="relative p-10 md:p-14 lg:p-16">
+//             <div className="max-w-2xl">
+//               <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
+//                 Une stack pensée pour durer trente ans.
+//               </h2>
+//               <p className="mt-5 text-base md:text-lg leading-relaxed text-muted">
+//                 Bitcoin pour l'incorruptibilité temporelle, Supabase pour la souplesse opérationnelle,
+//                 Web Crypto pour vérifier dans le navigateur sans serveur. Si nos serveurs meurent demain,
+//                 les preuves restent décodables par n'importe quel outil open-source.
+//               </p>
+//             </div>
 
-            <div className="mx-auto mt-14 grid max-w-[640px] grid-cols-2 gap-6 sm:grid-cols-4">
-              {items.map(({ Icon, name, sub }) => (
-                <div
-                  key={name}
-                  className="group/tile relative flex flex-col items-center gap-3 rounded-[24px] border border-border/60 bg-gradient-to-b from-white/80 to-white/40 dark:from-white/[0.04] dark:to-white/[0.02] p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out hover:-translate-y-1"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/60 ring-1 ring-border/60">
-                    <Icon className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-semibold tracking-tight">{name}</div>
-                    <div className="mt-0.5 text-xs text-muted">{sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+//             <div className="mx-auto mt-14 grid max-w-[640px] grid-cols-2 gap-6 sm:grid-cols-4">
+//               {items.map(({ Icon, name, sub }) => (
+//                 <div
+//                   key={name}
+//                   className="group/tile relative flex flex-col items-center gap-3 rounded-[24px] border border-border/60 bg-gradient-to-b from-white/80 to-white/40 dark:from-white/[0.04] dark:to-white/[0.02] p-5 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_20px_50px_-20px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_2px_rgba(255,255,255,0.08),inset_0_-2px_1px_rgba(0,0,0,0.4),0_26px_70px_-22px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out hover:-translate-y-1"
+//                 >
+//                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/60 ring-1 ring-border/60">
+//                     <Icon className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden />
+//                   </div>
+//                   <div className="text-center">
+//                     <div className="text-sm font-semibold tracking-tight">{name}</div>
+//                     <div className="mt-0.5 text-xs text-muted">{sub}</div>
+//                   </div>
+//                 </div>
+//               ))}
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     </section>
+//   );
+// }
 
 function FinalCta() {
   return (
     <section className="py-20 lg:py-28">
       <div className="container text-center max-w-2xl">
         <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight">
-          Prêt à sceller votre première vente ?
+          Prêt à sceller votre première transaction foncière ?
         </h2>
-        <p className="text-muted text-base mb-7">
-          Trois minutes pour notariser un acte. Une preuve qui survit à votre téléphone, votre serveur
-          et notre entreprise.
-        </p>
         <Link to="/citizen-portal"
           className="px-8 py-3 w-fit mx-auto font-medium bg-black dark:bg-[#008850] dark:hover:bg-white dark:hover:text-black hover:bg-green-400 text-white transition-colors duration-500 text-lg rounded-2xl flex flex-row items-center justify-center"
         >

@@ -97,7 +97,7 @@ export function HowItWorks() {
                 <Silk
                   speed={2}
                   scale={1}
-                  color="#3F3FE0"
+                  color="#C0F5B0"
                   noiseIntensity={0.8}
                   rotation={0}
                   paused={!visible}
@@ -125,7 +125,7 @@ export function HowItWorks() {
                     Comment ça marche ?
                   </h2>
 
-                  <ol className="flex flex-col gap-[1.7rem] pt-4">
+                  <ol className="flex flex-col gap-[1.7rem] pt-10">
                     {howSteps.map((s, i) => (
                       <StepRow
                         key={s.n}

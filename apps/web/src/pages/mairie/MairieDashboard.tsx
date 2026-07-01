@@ -5,7 +5,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { StatusChip } from '@/components/StatusChip'
 import { useAuth } from '@/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
-import logo from '@/assets/logo.svg'
+import logo from '../../public/logo.svg'
 
 type DossierRow = {
   id: string
