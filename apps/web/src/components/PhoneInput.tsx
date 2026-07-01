@@ -49,7 +49,7 @@ export function PhoneInput({ value, onChange, autoFocus, label, placeholder }: P
           aria-haspopup="listbox"
           aria-expanded={open}
         >
-          <span className="text-lg leading-none">{country.flag}</span>
+          <span className={`fi fi-${country.code.toLowerCase()} inline-block w-5 h-4 rounded-sm`} />
           <span className="text-text">{country.dial}</span>
           <ChevronDown className="w-3.5 h-3.5 text-muted" />
         </button>
@@ -77,7 +77,7 @@ export function PhoneInput({ value, onChange, autoFocus, label, placeholder }: P
                   onClick={() => { setCountry(c); setDigits(""); setOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-surface-2 transition-colors"
                 >
-                  <span className="text-lg leading-none">{c.flag}</span>
+                  <span className={`fi fi-${c.code.toLowerCase()} inline-block w-5 h-4 rounded-sm`} />
                   <span className="flex-1 text-left">{c.name}</span>
                   <span className="text-muted font-mono text-xs">{c.dial}</span>
                 </button>
