@@ -462,11 +462,23 @@ function FilePick({ id, label, hint, accept, multiple = false, files, onFiles }:
     const inputRef = useRef<HTMLInputElement>(null)
 
     const handleFiles = (incoming: File[]) => {
-        // Client-side guards — server should re-validate.
-        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-        const maxSize = 10 * 1024 * 1024 // 10 MB
-        const valid = incoming.filter((f) => allowed.includes(f.type) && f.size <= maxSize)
+        // Sur mobile iOS/Android, certains fichiers arrivent sans MIME (chaine vide).
+        // On accepte aussi via l'extension du nom pour ne pas les filtrer a tort.
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']
+        const allowedExt = /\.(jpe?g|png|webp|heic|heif|pdf)$/i
+        const maxSize = 10 * 1024 * 1024
+        const valid = incoming.filter((f) => {
+            const typeOk = f.type ? allowedTypes.includes(f.type) : allowedExt.test(f.name)
+            return typeOk && f.size > 0 && f.size <= maxSize
+        })
         onFiles(multiple ? [...files, ...valid] : valid.slice(0, 1))
+    }
+
+    // Affichage lisible : octets < Ko < Mo. Evite le "0.0 Mo" pour les petits fichiers.
+    const formatSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} o`
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`
+        return `${(bytes / 1024 / 1024).toFixed(1)} Mo`
     }
 
     return (
@@ -486,7 +498,7 @@ function FilePick({ id, label, hint, accept, multiple = false, files, onFiles }:
                             <FileText className="h-4 w-4 shrink-0 text-black/50 dark:text-white/50" />
                             <span className="truncate">{f.name}</span>
                             <span className="shrink-0 text-xs text-neutral-900/40 dark:text-white/40">
-                                {(f.size / 1024 / 1024).toFixed(1)} Mo
+                                {formatSize(f.size)}
                             </span>
                             <button type="button" aria-label={`Retirer ${f.name}`} onClick={() => onFiles(files.filter((_, idx) => idx !== i))} className="ml-auto rounded-md p-1 text-black/40 outline-none transition-colors hover:text-gandehou-red focus-visible:ring-2 focus-visible:ring-gandehou-red dark:text-white/40">
                                 <X className="h-4 w-4" />
