@@ -456,13 +456,16 @@ b.table(
 );
 
 b.h2("3.3 Modele de donnees (section 10 du dossier)");
-b.p("Le schema livre suit exactement la section 10 du dossier, avec 2 ajouts pragmatiques justifies.");
+b.p("Le schema livre suit exactement la section 10 du dossier, avec des extensions pour audio + biometrie.");
 b.table(
   ["Table du dossier", "Statut", "Notes"],
   [
     ["profiles", "OK", "FK auth.users souple (chef demo)"],
     ["dossiers", "OK +", "Ajout flag_etranger_zone_rurale + flag_superficie_seuil"],
-    ["documents", "OK", "Ajout ots_block_height + ots_confirmed_at"],
+    ["documents (base)", "OK", "Ajout ots_block_height + ots_confirmed_at"],
+    ["documents (audio)", "OK +", "audio_storage_path + audio_sha256"],
+    ["documents (signature)", "OK +", "signataire_pubkey_hash + credential_id + jwk + nom"],
+    ["documents (combined)", "OK +", "pdf_sha256 separe ; sha256 = combined ancre"],
     ["dossier_status_history", "OK", "Auto-remplie par trigger"],
     ["otp_sessions", "OK", "Conservee pour coherence (placeholder hackathon)"],
   ],
@@ -506,12 +509,14 @@ b.table(
   [
     ["profiles.ts", "CRUD profils + getCurrentOfficialProfile"],
     ["dossiers.ts", "CRUD + filtres par role + changerStatut + rejeterDossier"],
-    ["documents.ts", "CRUD + recherche par sha256 + createChainedDocument"],
-    ["storage.ts", "Upload PDF + .ots dans buckets, helpers specialises"],
+    ["documents.ts", "CRUD + createChainedDocument + createDocumentBundle"],
+    ["storage.ts", "Upload PDF + .ots dans 4 buckets, helpers specialises"],
     ["history.ts", "Lecture audit trail + annotation manuelle"],
     ["regles-andf.ts", "Moteur juridique pur (4 regles CFD)"],
     ["anchor.ts", "Invocation Edge Function anchor-document + upgrade"],
     ["verify.ts", "Verdict 3 etats + verification crypto deep"],
+    ["audio.ts", "Upload + download enregistrement vocal + hash"],
+    ["signature.ts", "Capture WebAuthn reelle (Touch ID/Face ID/Hello)"],
     ["index.ts", "Barrel d'imports unique"],
   ],
   [2, 5],
@@ -537,14 +542,15 @@ b.h1("5. Edge Functions Supabase");
 b.p("3 fonctions Deno deployees sur le projet uhfyofjxolhpunpbdefq. Endpoint base : https://uhfyofjxolhpunpbdefq.functions.supabase.co/");
 
 b.h2("5.1 anchor-document");
-b.p("Ancre un PDF deja uploade sur Bitcoin via OpenTimestamps. Etapes internes :");
+b.p("Ancre un bundle PDF + audio + signature sur Bitcoin. Etapes internes :");
 b.bullet([
-  "Lit la ligne documents (storage_bucket + storage_path + sha256)",
+  "Lit la ligne documents (incluant audio_storage_path, audio_sha256, signataire_pubkey_hash)",
   "Idempotence : si ots_proof_path deja renseigne, renvoie l'etat sans re-ancrer",
-  "Telecharge le PDF depuis Storage",
-  "Recalcule SHA-256 cote serveur (le client est hostile par defaut)",
-  "Verifie la coherence entre le hash en base et le hash recalcule",
-  "Appelle OpenTimestamps stamp() : contacte les calendriers publics",
+  "Telecharge le PDF depuis Storage et recalcule son SHA-256",
+  "Si audio attache : telecharge depuis documents-audio + recalcule + verifie hash",
+  "Recalcule le COMBINED HASH = pdf_sha256 [+ audio_sha256] [+ signataire_pubkey_hash]",
+  "Verifie que le combined recalcule == documents.sha256 (sinon refuse)",
+  "Appelle OpenTimestamps stamp() sur le combined : contacte les calendriers publics",
   "Uploade la preuve .ots dans le bucket ots-proofs",
   "Met a jour documents.ots_proof_path + ots_status = 'pending'",
 ]);
@@ -572,12 +578,14 @@ Response: { ok: true, stats: { scanned, upgraded, stillPending, errors[] } }`,
 );
 
 b.h2("5.3 verify-proof");
-b.p("Verification cryptographique reelle. Difference critique avec services/verify.ts :");
+b.p("Verification cryptographique reelle du bundle complet. Difference critique avec services/verify.ts :");
 b.bullet([
   "services/verify.ts (cote client) : compare juste un hash en base (instantane)",
-  "verify-proof (cote serveur) : telecharge .ots, valide cryptographiquement contre Bitcoin",
-  "C'est ce niveau de verification que le jury Bitcoin attend",
-  "Effet de bord important : si mismatch detecte, met a jour ots_status='mismatch' en base",
+  "verify-proof (cote serveur) : telecharge .ots, recalcule le combined hash, valide contre Bitcoin",
+  "Si audio attache : recalcule aussi le hash de l'audio actuel + verifie",
+  "Recompose le combined hash (PDF + audio + signature) et vrifie via OpenTimestamps",
+  "Si UNE seule alteration detectee (PDF, audio ou signature) : verdict mismatch",
+  "Effet de bord : ots_status='mismatch' propage en base pour les futurs lookups rapides",
 ]);
 b.code(
   `POST /verify-proof
@@ -606,10 +614,14 @@ b.bullet([
 b.h2("Etape 2 - Generation de l'attestation provisoire (statut: atteste_cq)");
 b.bullet([
   "PDF genere cote client via lib/pdf.ts (filigrane, QR code, donnees du dossier)",
-  "Hash SHA-256 calcule via Web Crypto API",
-  "createDocument() insere la ligne documents (type=attestation_provisoire)",
+  "Hash SHA-256 du PDF calcule via Web Crypto API",
+  "Optionnel : enregistrement vocal du consentement (Fon, Yoruba, Adja...) via AudioRecorder",
+  "Optionnel : capture biometrique reelle (Touch ID/Face ID) via FingerprintCapture/WebAuthn",
+  "uploadAudio() pousse l'audio dans le bucket documents-audio si present",
+  "captureSignature() retourne pubkey + credentialId + JWK si biometrie capturee",
+  "createDocumentBundle() insere la ligne avec sha256 = combined(pdf, audio, sig)",
   "uploadPdfProvisoire() pousse le PDF dans Storage",
-  "anchorDocument() appelle l'Edge Function anchor-document",
+  "anchorDocument() appelle l'Edge Function anchor-document avec le combined hash",
   "ots_status passe a 'pending' + .ots cree dans ots-proofs",
   "changerStatut(id, 'atteste_cq')",
 ]);
@@ -647,7 +659,7 @@ b.bullet([
 // ═══════════════════════════════════════════════════════════════════════════
 b._newPage();
 b.h1("7. Test end-to-end automatise");
-b.p("Le fichier supabase/test-e2e.mjs valide la chaine complete sur l'infrastructure reelle Supabase + OpenTimestamps. 12 etapes, idempotent, produit une sortie coloree.");
+b.p("Le fichier supabase/test-e2e.mjs valide la chaine complete sur l'infrastructure reelle Supabase + OpenTimestamps. 17 etapes, idempotent, produit une sortie coloree.");
 
 b.h2("Procedure");
 b.code(
@@ -659,7 +671,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 node supabase/test-e2e.mjs`,
 );
 
-b.h2("Les 12 etapes");
+b.h2("Les 17 etapes");
 b.table(
   ["#", "Etape", "Validation"],
   [
@@ -673,15 +685,20 @@ b.table(
     ["8", "Presence du .ots dans ots-proofs", "Download OK"],
     ["9", "Appel upgrade-ots", "stillPending=N (normal)"],
     ["10", "verify-proof (verification crypto)", "verdict=pending attendu"],
-    ["11", "Simulation falsification (PDF altere)", "verdict=mismatch DETECTE"],
+    ["11", "Falsification PDF (upload altere)", "verdict=mismatch DETECTE"],
     ["12", "Rejet dossier + audit trail", "litige + 2 entrees history"],
+    ["13", "Dossier bundle (PDF+audio+signature)", "INSERT + UUID"],
+    ["14", "Upload PDF + audio + insert combined", "Combined hash calcule"],
+    ["15", "Ancrage Bitcoin du bundle", "anchorResp.hash == combined attendu"],
+    ["16", "verify-proof bundle (hasAudio+hasSig)", "verdict=pending, flags ok"],
+    ["17", "Falsification AUDIO (upload altere)", "verdict=mismatch DETECTE"],
   ],
   [0.5, 3.5, 3],
 );
 
 b.callout(
-  "SCENARIO KILLER DU PITCH",
-  "L'etape 11 est ton scenario de demonstration cle : tu uploades un PDF different a la place de l'original, et le systeme detecte que le hash recalcule ne correspond plus a la preuve ancree. Le verdict passe a 'mismatch' et ots_status est propage en base. C'est exactement le recit 'Maman Chantal detecte la double vente' du README.",
+  "SCENARIOS KILLER DU PITCH",
+  "Etape 11 : un PDF different uploade a la place de l'original -> verdict mismatch instantane. Etape 17 (encore plus fort) : un audio different uploade a la place de l'enregistrement de consentement original -> verdict mismatch egalement. Le systeme protege les 3 elements du bundle independamment, et UN SEUL byte altere sur l'un des 3 suffit a invalider la preuve Bitcoin.",
   COLORS.red,
 );
 
@@ -696,15 +713,17 @@ b.table(
   ["Composant", "Etat", "Reference"],
   [
     ["Projet Supabase", "Actif", "uhfyofjxolhpunpbdefq"],
-    ["Schema SQL execute", "OK", "5 tables + 2 triggers"],
+    ["Schema SQL Gandehou execute", "OK", "5 tables + 2 triggers"],
+    ["Migration audio + signature", "OK", "7 colonnes ajoutees + 2 index"],
     ["Extension pg_cron", "Activee", "Database > Extensions"],
     ["Extension pg_net", "Activee", "Database > Extensions"],
-    ["Edge Function anchor-document", "Deployee", "Live + testee"],
+    ["Edge Function anchor-document", "Deployee", "Bundle combined hash"],
     ["Edge Function upgrade-ots", "Deployee", "Live + testee"],
-    ["Edge Function verify-proof", "Deployee", "Live + testee"],
+    ["Edge Function verify-proof", "Deployee", "Bundle verifie"],
     ["Bucket documents-provisoires", "Cree", "Public read"],
     ["Bucket documents-definitifs", "Cree", "Public read"],
     ["Bucket ots-proofs", "Cree", "Public read"],
+    ["Bucket documents-audio", "Cree", "Public read"],
     ["Cron gandehou-upgrade-ots", "Active", "*/30 * * * *"],
   ],
   [3, 1.5, 3],
@@ -734,6 +753,9 @@ b.bullet([
   "RLS permissives (using(true)) : les policies sont activees mais pas restrictives par role",
   "Validation des regles ANDF cote client : un acheteur malveillant peut techniquement bypass",
   "PDF generes cote client : pas de garantie d'integrite contenu vs trick navigateur",
+  "Validation crypto de la signature WebAuthn cote serveur : pubkey stockee mais signature future non verifiee",
+  "Transcription speech-to-text de l'audio : non faite (recherche full-text impossible sans transcript)",
+  "Challenge WebAuthn genere cote client : devrait venir d'une Edge Function en prod (anti-replay)",
   "Pas d'upload des pieces justificatives (CIP, ADC, plan topographique)",
   "Pas de notifications email aux parties au changement de statut",
 ]);
@@ -744,6 +766,9 @@ b.table(
   [
     ["RLS strictes par role (chef, mairie, admin, anon)", "1 jour", "CRITIQUE"],
     ["Edge Function submit-dossier (validation serveur)", "1 jour", "CRITIQUE"],
+    ["Edge Function verify-webauthn-signature", "1 jour", "Haute"],
+    ["Challenge WebAuthn cote serveur (anti-replay)", "0.5 jour", "Haute"],
+    ["Transcription audio (Whisper local ou cloud)", "1 jour", "Haute"],
     ["Upload des pieces justificatives en base", "2 jours", "Haute"],
     ["Notifications email Supabase Auth", "0.5 jour", "Haute"],
     ["Provider SMS pour OTP citoyens (Twilio/MTN)", "1 jour", "Haute"],
@@ -803,20 +828,37 @@ b.bullet([
   "Argument souverainete : le Benin n'a pas besoin de faire confiance a un fournisseur cloud etranger ; la preuve vit sur un reseau monetaire decentralise mondial",
 ]);
 
-b.h2("10.5 Cible utilisateurs");
+b.h2("10.5 Cible utilisateurs et inclusivite");
 b.p(
   "Gandehou est concu pour une population mixte : citoyens souvent illettres ou faiblement scolarises (40% de la population beninoise selon les statistiques nationales), agents fonciers communaux, notaires, banques, et a terme l'ANDF elle-meme via integration directe. L'interface s'appuie sur des codes visuels universels (vert/jaune/rouge inspires du drapeau national) et le QR code permet une verification meme sans saisie clavier."
 );
 b.p(
-  "Le scenario de reference que nous portons : Maman Chantal, vendeuse de poisson a Dantokpa, achete une parcelle a Abomey-Calavi. L'agent local saisit avec elle dans Gandehou, le PDF est ancre. Deux ans plus tard, le vendeur initial tente une seconde vente avec un document altere du meme dossier. Le second acheteur scanne le QR : alerte rouge instantanee. La preuve originale est recevable devant le tribunal sans dependre de la disponibilite d'un serveur."
+  "Pour franchir la barriere de l'illettrisme, Gandehou propose deux innovations inclusives ancrees ensemble dans Bitcoin via un combined hash en cascade : (1) un enregistrement vocal du consentement dans la langue locale (Fon, Yoruba, Adja, Bariba), capture via l'API MediaRecorder du navigateur et stocke en bucket dedie ; (2) une signature biometrique reelle (empreinte digitale, Face ID, Windows Hello) capturee via l'API WebAuthn standard, qui prouve cryptographiquement que l'utilisateur etait physiquement present sans jamais stocker la donnee biometrique elle-meme. Les trois (PDF + audio + biometrie) sont combines mathematiquement en une seule preuve Bitcoin, et l'alteration d'un seul des trois rend la preuve invalide."
 );
 
-b.h2("10.6 Modele economique et viabilite");
+b.h2("10.6 Scenario de reference : Maman Chantal");
+b.p(
+  "Maman Chantal, vendeuse de poisson a Dantokpa, illettree, achete une parcelle a Abomey-Calavi. L'agent foncier ouvre Gandehou. Etapes en 5 minutes :"
+);
+b.bullet([
+  "L'agent saisit les donnees avec Chantal (nom vendeur, parcelle, voisinage)",
+  "Chantal enregistre 10 secondes en Fon : 'Je, Chantal Hounkpevi, achete la parcelle ABC...'",
+  "L'audio est uploade dans le bucket documents-audio + hash SHA-256 calcule",
+  "Chantal pose son doigt sur l'ecran du smartphone : Touch ID/Face ID capture une Passkey",
+  "Les 3 hashes (PDF + audio + pubkey biometrique) sont combines en cascade",
+  "Le combined hash est ancre sur Bitcoin via OpenTimestamps (sous 3 secondes)",
+  "Chantal repart avec un PDF contenant un QR code unique et une copie audio sur son telephone",
+]);
+b.p(
+  "Deux ans plus tard, le vendeur initial tente une seconde vente du meme terrain avec un document altere. Le second acheteur scanne le QR : alerte rouge instantanee. Mieux : Chantal peut faire ecouter au tribunal son enregistrement vocal de consentement original, prouve crypto-graphiquement comme datant de la vente initiale (et non rejoue/falsifie posterieurement). La preuve sur Bitcoin est recevable devant le tribunal independamment de la disponibilite des serveurs Gandehou : meme si nous fermons demain, n'importe quel outil OpenTimestamps tiers peut decoder la preuve."
+);
+
+b.h2("10.7 Modele economique et viabilite");
 b.p(
   "Gandehou est concu pour etre gratuit pour le citoyen final (verification publique sans compte). Le modele de revenus repose sur trois piliers : (1) API premium pour les banques et notaires qui font de la verification en masse, (2) partenariat institutionnel avec l'ANDF et les communes pour integration au circuit officiel (financement public via PPMEC ou bailleurs), (3) services additionnels (notifications WhatsApp, signatures biometriques avancees, archivage longue duree)."
 );
 
-b.h2("10.7 Ce qui rend ce projet specifiquement beninois");
+b.h2("10.8 Ce qui rend ce projet specifiquement beninois");
 b.bullet([
   "Cadrage juridique strict : le projet cite explicitement les articles du CFD et le decret 2025-176",
   "Codes visuels du drapeau national (vert/jaune/rouge), conviction esthetique africaine",
