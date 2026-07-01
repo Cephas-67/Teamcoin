@@ -39,45 +39,16 @@ function PageLoader() {
 
 /* ── SmartDashboard — redirects by role ─────────────────────────────── */
 function SmartDashboard() {
-  const { chef, role, loading, refresh } = useAuth()
+  const { chef, role, loading } = useAuth()
 
   if (loading) return <PageLoader />
   if (!chef) return <Navigate to="/connexion" replace />
   if (role === 'chef_quartier') return <Navigate to="/cq/dashboard" replace />
   if (role === 'agent_mairie' || role === 'admin') return <Navigate to="/mairie/dashboard" replace />
 
-  // Fallback pour les phone-demo qui ont saute /onboarding : selecteur de role.
-  const pickRole = async (r: 'chef_quartier' | 'agent_mairie') => {
-    try { localStorage.setItem('gandehou-demo-role', r) } catch { /* prive */ }
-    await refresh()
-  }
-
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gandehou-paper px-6 text-center dark:bg-neutral-950 dark:text-white">
-      <div>
-        <p className="text-lg font-semibold">Choisissez votre rôle</p>
-        <p className="mt-2 max-w-sm text-sm text-neutral-900/60 dark:text-white/60">
-          Aucun rôle n'a encore été assigné à votre compte. Sélectionnez le vôtre pour continuer.
-        </p>
-      </div>
-      <div className="flex w-full max-w-sm flex-col gap-3">
-        <button
-          type="button"
-          onClick={() => pickRole('chef_quartier')}
-          className="rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
-        >
-          Je suis Chef de Quartier
-        </button>
-        <button
-          type="button"
-          onClick={() => pickRole('agent_mairie')}
-          className="rounded-2xl border border-black/15 px-6 py-4 text-lg font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:border-white/15 dark:hover:bg-white/10"
-        >
-          Je suis Agent Mairie
-        </button>
-      </div>
-    </div>
-  )
+  // Aucun role : renvoie sur /onboarding qui a le design 3 cartes (Citoyen,
+  // Chef quartier, Notaire) — meme UX que la premiere visite.
+  return <Navigate to="/onboarding" replace />
 }
 
 /* ── 404 ────────────────────────────────────────────────────────────── */
