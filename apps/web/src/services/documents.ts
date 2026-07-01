@@ -143,7 +143,7 @@ export async function createDocumentBundle(
     signataire_nom: input.signature?.signataireNom ?? null,
     qr_code_url: input.qr_code_url ?? null,
     created_by: input.created_by ?? null,
-  } as DocumentInput);
+  } as unknown as DocumentInput);
 }
 
 // Combine N hashes en cascade (gauche à droite) via combinedHash.

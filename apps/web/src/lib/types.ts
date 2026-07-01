@@ -12,10 +12,11 @@
 export type ProfileRole = "chef_quartier" | "agent_mairie" | "admin";
 
 export type DossierStatut =
-  | "brouillon"        // créé, données saisies, pas encore ancré
-  | "atteste_cq"       // attestation provisoire signée par le CQ, ancrée OTS
-  | "valide_mairie"    // convention finale validée par la Mairie, second ancrage
-  | "litige";          // marqué litigieux (badge rouge)
+  | "brouillon"        // legacy · reste supporte
+  | "soumis"           // citoyen a soumis, en attente d'attestation par le CQ
+  | "atteste_cq"       // attestation provisoire emise par le CQ, ancree OTS
+  | "valide_mairie"    // convention finale validee par la Mairie, second ancrage
+  | "litige";          // marque litigieux
 
 export type Zone = "urbaine" | "rurale";
 

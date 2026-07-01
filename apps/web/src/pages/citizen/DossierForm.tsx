@@ -2,9 +2,12 @@ import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { CheckCircle2, Copy, FileText, MessageCircle, Upload, X } from 'lucide-react'
+import { CheckCircle2, Clock, Copy, FileText, MessageCircle, Upload, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { PortalNav } from '@/components/PortalNav'
 import Stepper, { Step } from '@/components/Stepper'
+import { supabase } from '@/lib/supabase'
 
 /* ------------------------------------------------------------------ *
  * Validation helpers
@@ -14,6 +17,13 @@ import Stepper, { Step } from '@/components/Stepper'
 const NPI_REGEX = /^\d{13}$/
 // Passeport : 6–9 caractères alphanumériques (norme OACI).
 const PASSPORT_REGEX = /^[A-Z0-9]{6,9}$/i
+// Téléphone béninois : 8 ou 10 chiffres, ou +229 suivi de 8 chiffres.
+const PHONE_REGEX = /^(\+229)?\d{8,10}$/
+const phoneSchema = z
+    .string()
+    .min(1, 'Numéro requis.')
+    .refine((v) => PHONE_REGEX.test(v.replace(/\s+/g, '')), 'Numéro invalide (8-10 chiffres, préfixe +229 optionnel).')
+    .transform((v) => v.replace(/\s+/g, ''))
 // Accepte NPI OU passeport — le champ est "CIP ou passeport".
 const pieceSchema = z
     .string()
@@ -76,11 +86,13 @@ const schema = z
     .object({
         vendeur_nom: nameSchema('Nom du vendeur'),
         vendeur_cip: pieceSchema,
+        vendeur_phone: phoneSchema,
         acheteur_nom: nameSchema("Nom de l'acheteur"),
         acheteur_nationalite: z.enum(NATIONALITES, {
             required_error: 'Nationalité requise.',
         }),
         acheteur_cip: pieceSchema,
+        acheteur_phone: phoneSchema,
         departement: locationSchema('Département'),
         commune: locationSchema('Commune'),
         arrondissement: locationSchema('Arrondissement'),
@@ -112,8 +124,8 @@ const schema = z
 type DossierValues = z.infer<typeof schema>
 
 const STEP_FIELDS: (keyof DossierValues)[][] = [
-    ['vendeur_nom', 'vendeur_cip'],
-    ['acheteur_nom', 'acheteur_nationalite', 'acheteur_cip'],
+    ['vendeur_nom', 'vendeur_cip', 'vendeur_phone'],
+    ['acheteur_nom', 'acheteur_nationalite', 'acheteur_cip', 'acheteur_phone'],
     ['departement', 'commune', 'arrondissement', 'quartier'],
     ['superficie_m2', 'zone', 'origine_droit'],
     ['voisin_nord', 'voisin_sud', 'voisin_est', 'voisin_ouest'],
@@ -133,7 +145,8 @@ const selectCls = inputCls + ' appearance-none bg-[length:16px] bg-[right_12px_c
  * ------------------------------------------------------------------ */
 export default function DossierForm() {
     const [step, setStep] = useState(1)
-    const [submitted, setSubmitted] = useState<string | null>(null)
+    const [submitted, setSubmitted] = useState<{ id: string; phone: string } | null>(null)
+    const [submitting, setSubmitting] = useState(false)
     const [plan, setPlan] = useState<File[]>([])
     const [pieces, setPieces] = useState<File[]>([])
     const [docError, setDocError] = useState('')
@@ -171,7 +184,6 @@ export default function DossierForm() {
             setDocError('Ajoutez au moins le plan du géomètre.')
             return
         }
-        // Validate file types
         const invalidFiles = [...plan, ...pieces].filter(
             (f) => !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type),
         )
@@ -179,7 +191,6 @@ export default function DossierForm() {
             setDocError('Formats acceptés : JPEG, PNG, WebP, PDF.')
             return
         }
-        // Validate file sizes (max 10MB each)
         const oversized = [...plan, ...pieces].filter((f) => f.size > 10 * 1024 * 1024)
         if (oversized.length > 0) {
             setDocError('Taille maximale par fichier : 10 Mo.')
@@ -187,14 +198,54 @@ export default function DossierForm() {
         }
         setDocError('')
 
-        // TODO(api): replace with:
-        //   import { createDossier, evaluerReglesAndf, estBloque } from '@/services'
-        //   const eval_ = evaluerReglesAndf(getValues())
-        //   if (estBloque(eval_)) { toast.error(...); return }
-        //   const dossier = await createDossier(getValues())
-        //   navigate(`/verifier/${dossier.id}`)
-        void getValues()
-        setSubmitted(`GDH-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`)
+        const v = getValues()
+        setSubmitting(true)
+        try {
+            const { data, error } = await supabase
+                .from('dossiers')
+                .insert({
+                    statut: 'soumis',
+                    vendeur_nom: v.vendeur_nom,
+                    vendeur_cip: v.vendeur_cip,
+                    vendeur_phone: v.vendeur_phone,
+                    acheteur_nom: v.acheteur_nom,
+                    acheteur_cip: v.acheteur_cip,
+                    acheteur_phone: v.acheteur_phone,
+                    acheteur_nationalite: v.acheteur_nationalite,
+                    departement: v.departement,
+                    commune: v.commune,
+                    arrondissement: v.arrondissement,
+                    quartier: v.quartier,
+                    superficie_m2: v.superficie_m2,
+                    zone: v.zone,
+                    origine_droit: v.origine_droit,
+                    voisin_nord: v.voisin_nord,
+                    voisin_sud: v.voisin_sud,
+                    voisin_est: v.voisin_est,
+                    voisin_ouest: v.voisin_ouest,
+                })
+                .select('id')
+                .single()
+
+            if (error || !data) {
+                toast.error(error?.message ?? 'Impossible de soumettre le dossier.')
+                return
+            }
+
+            // Notifie le CQ concerne (best-effort, non-bloquant).
+            supabase.functions.invoke('notify-cq-new-dossier', {
+                body: { dossierId: data.id },
+            }).catch(() => { /* silencieux, l'admin verra via le dashboard */ })
+
+            // Sauvegarde le telephone localement pour la page de suivi.
+            try { localStorage.setItem('gandehou:citizen_phone', v.vendeur_phone) } catch { /* privee */ }
+
+            setSubmitted({ id: data.id, phone: v.vendeur_phone })
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Erreur reseau.')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     return (
@@ -203,7 +254,7 @@ export default function DossierForm() {
 
             <main className="mx-auto w-full max-w-3xl px-6 pb-20">
                 {submitted ? (
-                    <DossierSuccess num={submitted} />
+                    <DossierSuccess id={submitted.id} phone={submitted.phone} />
                 ) : (
                     <>
                         <h1 className="mb-2 text-center text-3xl font-semibold xl:text-5xl">Initier un dossier</h1>
@@ -235,6 +286,10 @@ export default function DossierForm() {
                                             NPI : 13 chiffres · Passeport : 6–9 caractères
                                         </p>
                                     </Field>
+                                    <Field label="Téléphone (WhatsApp)" error={errors.vendeur_phone?.message} htmlFor="vendeur_phone">
+                                        <input id="vendeur_phone" type="tel" inputMode="tel" className={inputCls} aria-invalid={!!errors.vendeur_phone}
+                                            placeholder="ex : 97000000 ou +22997000000" {...register('vendeur_phone')} />
+                                    </Field>
                                 </fieldset>
                             </Step>
 
@@ -261,6 +316,10 @@ export default function DossierForm() {
                                         <p className="mt-1 text-xs text-neutral-900/40 dark:text-white/40">
                                             NPI : 13 chiffres · Passeport : 6–9 caractères
                                         </p>
+                                    </Field>
+                                    <Field label="Téléphone (WhatsApp)" error={errors.acheteur_phone?.message} htmlFor="acheteur_phone">
+                                        <input id="acheteur_phone" type="tel" inputMode="tel" className={inputCls} aria-invalid={!!errors.acheteur_phone}
+                                            placeholder="ex : 97000000 ou +22997000000" {...register('acheteur_phone')} />
                                     </Field>
                                 </fieldset>
                             </Step>
@@ -431,43 +490,58 @@ function FilePick({ id, label, hint, accept, multiple = false, files, onFiles }:
     )
 }
 
-function DossierSuccess({ num }: { num: string }) {
+function DossierSuccess({ id, phone }: { id: string; phone: string }) {
     const [copied, setCopied] = useState(false)
-    const link = `${window.location.origin}/verifier/${num}`
-    const message = `Bonjour, voici mon dossier foncier Gandehou n° ${num}. Lien : ${link}`
-    const waHref = `https://wa.me/?text=${encodeURIComponent(message)}`
+    const shortId = id.slice(0, 8).toUpperCase()
+    const link = `${window.location.origin}/verifier/${id}`
 
     const copy = async () => {
         try {
-            await navigator.clipboard.writeText(num)
+            await navigator.clipboard.writeText(shortId)
             setCopied(true)
             setTimeout(() => setCopied(false), 2000)
-        } catch { /* clipboard unavailable */ }
+        } catch { /* clipboard indisponible */ }
     }
 
     return (
         <div className="mx-auto max-w-md text-center">
-            <CheckCircle2 className="mx-auto h-16 w-16 text-gandehou-green" />
-            <h1 className="mt-6 text-3xl font-semibold">Dossier créé</h1>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gandehou-yellow/20">
+                <Clock className="h-8 w-8 text-amber-600 dark:text-gandehou-yellow" />
+            </div>
+            <h1 className="mt-6 text-3xl font-semibold">Dossier soumis</h1>
             <p className="mt-2 text-neutral-900/60 dark:text-white/60">
-                Transmettez ce numéro à votre Chef de Quartier pour la suite.
+                Votre dossier est en attente d'attestation par votre Chef de Quartier.
+                Vous serez notifié dès qu'il aura été validé.
             </p>
 
-            <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl border border-black/10 bg-gandehou-green/10 px-5 py-4 dark:border-white/10">
-                <span className="text-xl font-bold tracking-wide text-gandehou-green">{num}</span>
-                <button type="button" onClick={copy} aria-label="Copier le numéro de dossier" className="rounded-lg p-2 text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/10 focus-visible:ring-4 focus-visible:ring-gandehou-green/30">
+            <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl border border-black/10 bg-gandehou-yellow/15 px-5 py-4 dark:border-white/10">
+                <span className="font-mono text-lg font-bold tracking-wide text-amber-700 dark:text-gandehou-yellow">{shortId}</span>
+                <button type="button" onClick={copy} aria-label="Copier l'identifiant" className="rounded-lg p-2 text-amber-700 outline-none transition-colors hover:bg-black/5 focus-visible:ring-4 focus-visible:ring-gandehou-yellow/30 dark:text-gandehou-yellow">
                     <Copy className="h-5 w-5" />
                 </button>
             </div>
-            {copied && <p className="mt-2 text-sm text-gandehou-green">Numéro copié</p>}
+            {copied && <p className="mt-2 text-sm text-gandehou-green">Identifiant copié</p>}
 
-            <a href={waHref} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40">
-                <MessageCircle className="h-6 w-6" />
+            <Link
+                to={`/citizen-portal?phone=${encodeURIComponent(phone)}`}
+                className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gandehou-green px-6 py-4 text-lg font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40"
+            >
+                <CheckCircle2 className="h-6 w-6" />
+                Voir mes dossiers
+            </Link>
+
+            <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Bonjour, mon dossier foncier Gandehou (ID ${shortId}) est en attente d'attestation. Suivi : ${link}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 px-6 py-3 font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:border-white/10 dark:hover:bg-white/10"
+            >
+                <MessageCircle className="h-5 w-5" />
                 Partager par WhatsApp
             </a>
 
             <p className="mt-6 text-xs leading-relaxed text-neutral-900/50 dark:text-white/50">
-                Document provisoire — sans valeur de titre de propriété. Gandehou sécurise la preuve
+                Document en attente — sans valeur de titre de propriété. Gandehou sécurise la preuve
                 d'antériorité et d'intégrité, en amont du circuit légal (Notaire / ANDF).
             </p>
         </div>

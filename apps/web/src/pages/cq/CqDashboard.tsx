@@ -8,17 +8,17 @@ import { supabase } from '@/lib/supabase'
 import logo from '../../public/logo.svg'
 import { LogoutModal } from '@/components/LogoutModal'
 
-// Mirrors the dossiers table (spec p.14). Only the fields the dashboard needs.
+type DossierStatut = 'brouillon' | 'soumis' | 'atteste_cq' | 'valide_mairie' | 'litige'
+
 type DossierRow = {
   id: string
-  statut: 'brouillon' | 'atteste_cq' | 'valide_mairie'
+  statut: DossierStatut
   vendeur_nom: string
   acheteur_nom: string
   quartier: string | null
   commune: string | null
   superficie_m2: number | null
   created_at: string
-  // Synthesised client-side: true if created in the last 24h.
   isNew?: boolean
 }
 
@@ -27,31 +27,46 @@ export default function CqDashboard() {
   const [dossiers, setDossiers] = useState<DossierRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cqQuartier, setCqQuartier] = useState<string | null>(null)
 
   const load = async () => {
+    if (!chef) return
     setLoading(true)
     setError('')
-    // TODO(api): add .eq('chef_quartier_id', chef?.id) once the foreign key
-    // linking dossiers to a CQ's zone or profile is defined.
-    const { data, error: err } = await supabase
+
+    // 1. Recupere le profil du CQ pour connaitre son quartier.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('quartier,commune')
+      .eq('id', chef.id)
+      .maybeSingle()
+
+    const quartier = profile?.quartier ?? null
+    setCqQuartier(quartier)
+
+    // 2. Liste les dossiers soumis (ou brouillon legacy) de son quartier.
+    let query = supabase
       .from('dossiers')
       .select('id,statut,vendeur_nom,acheteur_nom,quartier,commune,superficie_m2,created_at')
-      .eq('statut', 'brouillon')
+      .in('statut', ['soumis', 'brouillon'])
       .order('created_at', { ascending: false })
 
+    if (quartier) query = query.eq('quartier', quartier)
+
+    const { data, error: err } = await query
     if (err) { setError(err.message); setLoading(false); return }
 
     const cutoff = Date.now() - 24 * 60 * 60 * 1000
     setDossiers(
       (data ?? []).map((d) => ({
-        ...d,
+        ...(d as DossierRow),
         isNew: new Date(d.created_at).getTime() > cutoff,
       }))
     )
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [chef?.id])
 
   const displayName = chef?.email?.split('@')[0] ?? chef?.phone ?? 'Chef'
 
@@ -74,7 +89,9 @@ export default function CqDashboard() {
           <p className="text-sm font-medium text-gandehou-green">Espace Chef de Quartier</p>
           <h1 className="mt-1 text-2xl font-semibold">Bonjour, {displayName}</h1>
           <p className="mt-1 text-sm text-neutral-900/60 dark:text-white/60">
-            Dossiers en attente de votre attestation de voisinage.
+            {cqQuartier
+              ? `Dossiers soumis sur le quartier ${cqQuartier}.`
+              : 'Dossiers en attente de votre attestation de voisinage.'}
           </p>
         </div>
 
@@ -135,7 +152,7 @@ export default function CqDashboard() {
                     </span>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       {d.isNew && <StatusChip status="nouveau" label="Nouveau" />}
-                      <StatusChip status="brouillon" />
+                      <StatusChip status={d.statut === 'soumis' ? 'soumis' : 'brouillon'} />
                     </div>
                   </div>
 

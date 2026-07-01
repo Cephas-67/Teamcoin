@@ -11,7 +11,7 @@ import { StatusChip } from '@/components/StatusChip'
 import { FingerprintCapture, type CapturedSignature } from '@/components/FingerprintCapture'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/auth/AuthProvider'
-import logo from '@/assets/logo.svg'
+import logo from '@/public/logo.svg'
 import { cn } from '@/lib/cn'
 
 /* ------------------------------------------------------------------ *

@@ -1,8 +1,11 @@
-import { ArrowRight, FilePlus2, ShieldCheck } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { ArrowRight, Clock, FilePlus2, MapPin, Search, ShieldCheck } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Variants } from 'framer-motion'
 import { PortalNav } from '@/components/PortalNav'
+import { StatusChip, type ChipStatus } from '@/components/StatusChip'
+import { supabase } from '@/lib/supabase'
 
 type Journey = {
   id: string
@@ -13,7 +16,6 @@ type Journey = {
   icon: typeof FilePlus2
 }
 
-// Routes reused from the Footer so the app stays consistent.
 const JOURNEYS: Journey[] = [
   {
     id: 'dossier',
@@ -35,6 +37,17 @@ const JOURNEYS: Journey[] = [
   },
 ]
 
+type DossierRow = {
+  id: string
+  statut: 'brouillon' | 'soumis' | 'atteste_cq' | 'valide_mairie' | 'litige'
+  vendeur_nom: string
+  acheteur_nom: string
+  quartier: string | null
+  commune: string | null
+  superficie_m2: number | null
+  created_at: string
+}
+
 const list: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
@@ -46,10 +59,43 @@ const card: Variants = {
 
 export default function CitizenPortal() {
   const reduceMotion = useReducedMotion()
+  const [params] = useSearchParams()
   const listMotion = reduceMotion
     ? {}
     : { variants: list, initial: 'hidden' as const, animate: 'show' as const }
   const cardMotion = reduceMotion ? {} : { variants: card }
+
+  const [phone, setPhone] = useState(() => {
+    const fromUrl = params.get('phone')
+    if (fromUrl) return fromUrl
+    try { return localStorage.getItem('gandehou:citizen_phone') ?? '' } catch { return '' }
+  })
+  const [searching, setSearching] = useState(false)
+  const [dossiers, setDossiers] = useState<DossierRow[] | null>(null)
+  const [error, setError] = useState('')
+
+  const cleanPhone = (p: string) => p.replace(/\s+/g, '')
+
+  const lookup = async (p: string) => {
+    const clean = cleanPhone(p)
+    if (clean.length < 8) return
+    setSearching(true)
+    setError('')
+    const { data, error: err } = await supabase
+      .from('dossiers')
+      .select('id,statut,vendeur_nom,acheteur_nom,quartier,commune,superficie_m2,created_at')
+      .or(`vendeur_phone.eq.${clean},acheteur_phone.eq.${clean}`)
+      .order('created_at', { ascending: false })
+    if (err) setError(err.message)
+    else setDossiers((data ?? []) as DossierRow[])
+    setSearching(false)
+    try { localStorage.setItem('gandehou:citizen_phone', clean) } catch { /* prive */ }
+  }
+
+  useEffect(() => {
+    if (phone) lookup(phone)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="min-h-screen w-full bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
@@ -86,6 +132,82 @@ export default function CitizenPortal() {
             )
           })}
         </motion.ul>
+
+        {/* ── Suivi de mes dossiers · lookup par numero de telephone ─── */}
+        <section className="mt-16 rounded-3xl border border-black/10 bg-white p-6 dark:border-white/10 dark:bg-white/[0.03] md:p-8">
+          <h2 className="text-xl font-semibold md:text-2xl">Suivre mes dossiers</h2>
+          <p className="mt-1 text-sm text-neutral-900/60 dark:text-white/60">
+            Entrez votre numéro de téléphone pour voir les dossiers où vous êtes vendeur ou acheteur.
+          </p>
+
+          <form
+            className="mt-5 flex flex-col gap-3 sm:flex-row"
+            onSubmit={(e) => { e.preventDefault(); lookup(phone) }}
+          >
+            <input
+              type="tel"
+              inputMode="tel"
+              placeholder="ex : 97000000 ou +22997000000"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="flex-1 rounded-xl border border-black/10 bg-white px-4 py-3 text-black outline-none transition focus-visible:border-gandehou-green focus-visible:ring-4 focus-visible:ring-gandehou-green/20 dark:border-white/15 dark:bg-white/5 dark:text-white"
+            />
+            <button
+              type="submit"
+              disabled={searching || cleanPhone(phone).length < 8}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gandehou-green px-5 py-3 font-medium text-white outline-none transition-colors hover:bg-gandehou-green/90 focus-visible:ring-4 focus-visible:ring-gandehou-green/40 disabled:opacity-50"
+            >
+              <Search className="h-4 w-4" />
+              {searching ? 'Recherche…' : 'Rechercher'}
+            </button>
+          </form>
+
+          {error && (
+            <p role="alert" className="mt-4 rounded-xl border border-gandehou-red/30 bg-gandehou-red/10 px-4 py-3 text-sm text-gandehou-red">
+              {error}
+            </p>
+          )}
+
+          {dossiers && dossiers.length === 0 && !searching && (
+            <p className="mt-6 rounded-xl border border-dashed border-black/15 py-8 text-center text-sm text-neutral-900/60 dark:border-white/15 dark:text-white/60">
+              Aucun dossier trouvé pour ce numéro.
+            </p>
+          )}
+
+          {dossiers && dossiers.length > 0 && (
+            <ul className="mt-6 space-y-3">
+              {dossiers.map((d) => (
+                <li key={d.id}>
+                  <Link
+                    to={`/verifier/${d.id}`}
+                    className="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white p-4 outline-none transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-mono text-xs text-neutral-900/40 dark:text-white/40">
+                        {d.id.slice(0, 8).toUpperCase()}
+                      </span>
+                      <StatusChip status={d.statut as ChipStatus} />
+                    </div>
+                    <p className="text-sm font-medium">{d.vendeur_nom} → {d.acheteur_nom}</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-900/50 dark:text-white/50">
+                      {(d.quartier || d.commune) && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {[d.quartier, d.commune].filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                      {d.superficie_m2 && <span>{d.superficie_m2.toLocaleString('fr-FR')} m²</span>}
+                      <span className="ml-auto flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(d.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
     </div>
   )

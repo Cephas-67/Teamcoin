@@ -37,9 +37,20 @@ function estBeninois(nationalite: string | null | undefined): boolean {
   return nationalite.trim().toLowerCase().startsWith("benin"); // "beninoise", "béninois"...
 }
 
+// Détermine si l'acheteur est béninois avec priorité au type d'identifiant :
+//   1. Si acheteur_id_type = 'passeport' -> étranger (règle sans ambiguïté)
+//   2. Si acheteur_id_type = 'cip'       -> béninois (le CIP est réservé aux nationaux)
+//   3. Sinon, on retombe sur acheteur_nationalite (compat legacy)
+function deriverNationaliteBeninoise(d: DossierInput | Dossier): boolean {
+  const t = (d as any).acheteur_id_type as string | null | undefined;
+  if (t === "passeport") return false;
+  if (t === "cip") return true;
+  return estBeninois(d.acheteur_nationalite);
+}
+
 export function evaluerReglesAndf(d: DossierInput | Dossier): EvaluationAndf {
   const alertes: AlerteAndf[] = [];
-  const beninois = estBeninois(d.acheteur_nationalite);
+  const beninois = deriverNationaliteBeninoise(d);
   const superficieHa = d.superficie_m2 ? d.superficie_m2 / M2_PAR_HA : 0;
 
   // Règle 4 · plafond absolu 1000 ha

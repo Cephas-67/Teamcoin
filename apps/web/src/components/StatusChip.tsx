@@ -15,6 +15,7 @@ import { cn } from '@/lib/cn'
  */
 export type ChipStatus =
   | 'brouillon'
+  | 'soumis'
   | 'atteste_cq'
   | 'valide_mairie'
   | 'ots_pending'
@@ -35,6 +36,7 @@ const TONE: Record<Tone, string> = {
 
 const CONFIG: Record<ChipStatus, { label: string; tone: Tone; icon: typeof FileText }> = {
   brouillon: { label: 'Brouillon', tone: 'neutral', icon: FileText },
+  soumis: { label: 'Soumis · en attente CQ', tone: 'yellow', icon: Clock },
   atteste_cq: { label: 'Attesté CQ · provisoire', tone: 'yellow', icon: FileWarning },
   valide_mairie: { label: 'Validé Mairie', tone: 'green', icon: ShieldCheck },
   ots_pending: { label: 'Ancrage en attente', tone: 'yellow', icon: Clock },
