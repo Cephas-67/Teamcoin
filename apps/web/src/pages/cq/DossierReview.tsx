@@ -80,6 +80,9 @@ export default function DossierReview() {
     const [acheteurPieceUrl, setAcheteurPieceUrl] = useState('')
     const [vendeurAudioUrl, setVendeurAudioUrl] = useState('')
     const [acheteurAudioUrl, setAcheteurAudioUrl] = useState('')
+    // Blob URL du PDF · cree UNE FOIS quand le blob est dispo, revoke a l'unmount.
+    // Sans ce useEffect, l'iframe se rechargeait a chaque re-render.
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState('')
 
     // Attestation state (post-signature)
     const [qrDataUrl, setQrDataUrl] = useState('')
@@ -107,6 +110,14 @@ export default function DossierReview() {
                 setLoading(false)
             })
     }, [id])
+
+    // Cree la Blob URL une fois quand le PDF est pret, la revoke a l'unmount.
+    useEffect(() => {
+        if (!pdfBlob) return
+        const url = URL.createObjectURL(pdfBlob)
+        setPdfPreviewUrl(url)
+        return () => URL.revokeObjectURL(url)
+    }, [pdfBlob])
 
     // Recupere les URLs signees (bucket prive) et publiques pour affichage
     const loadCaptureUrls = async (d: Dossier) => {
@@ -304,7 +315,6 @@ export default function DossierReview() {
 
     // ── Ecran d'attestation emise ────────────────────────────────────
     if (flowStep === 'confirmed') {
-        const pdfPreviewUrl = pdfBlob ? URL.createObjectURL(pdfBlob) : ''
         return (
             <div className="min-h-screen bg-gandehou-paper text-neutral-900 dark:bg-neutral-950 dark:text-white">
                 <PageHeader backTo="/cq/dashboard" />

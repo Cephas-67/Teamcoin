@@ -71,20 +71,15 @@ export async function generateAttestationPdf(
   const pageWidth = 595;
   const pageHeight = 842;
 
-  // ── Motif de fond (filigrane) ─────────────────────────────────────────
+  // ── Motif de fond (filigrane) · une seule tuile 400x400 ──────────────
+  // La conversion SVG→PNG est cachee au niveau module (voir svgToPngCached)
+  // → seule la premiere generation paie le cout, les suivantes sont instantanees.
   try {
-    const motifPng = await svgToPngBytes(motifUrl, 800, 800);
+    const motifPng = await svgToPngCached(motifUrl, 400, 400);
     if (motifPng) {
       const motif = await pdf.embedPng(motifPng);
-      // 3 copies tuiles douces, opacite tres faible
       page.drawImage(motif, {
-        x: -50, y: pageHeight - 400, width: 400, height: 400, opacity: 0.06,
-      });
-      page.drawImage(motif, {
-        x: pageWidth - 350, y: 200, width: 400, height: 400, opacity: 0.06,
-      });
-      page.drawImage(motif, {
-        x: 100, y: -100, width: 400, height: 400, opacity: 0.05,
+        x: pageWidth - 380, y: 240, width: 380, height: 380, opacity: 0.05,
       });
     }
   } catch { /* motif optionnel · on continue sans */ }
@@ -93,7 +88,7 @@ export async function generateAttestationPdf(
 
   // ── En-tete · logo + nom marque ───────────────────────────────────────
   try {
-    const logoPng = await svgToPngBytes(logoUrl, 200, 60);
+    const logoPng = await svgToPngCached(logoUrl, 200, 60);
     if (logoPng) {
       const logo = await pdf.embedPng(logoPng);
       const logoDims = logo.scale(0.35);
@@ -274,6 +269,19 @@ async function buildCqSignature(cqId: string, tsIso: string, dossierId: string):
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+// Cache module-level : les SVG (logo + motif) sont converties une seule fois
+// pour toute la session. La deuxieme generation de PDF est ~2s plus rapide.
+const svgPngCache = new Map<string, Promise<Uint8Array | null>>();
+
+function svgToPngCached(url: string, width: number, height: number): Promise<Uint8Array | null> {
+  const key = `${url}::${width}x${height}`;
+  const hit = svgPngCache.get(key);
+  if (hit) return hit;
+  const p = svgToPngBytes(url, width, height);
+  svgPngCache.set(key, p);
+  return p;
 }
 
 /**
