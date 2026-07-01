@@ -6,7 +6,7 @@ import {
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { BackButton } from '@/components/BackButton'
 import { PhoneInput } from '@/components/PhoneInput'
-import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo, type SignupRole } from '@/services/auth'
+import { sendEmailOtp, verifyEmailOtp, loginWithPhoneDemo } from '@/services/auth'
 import { countries, formatPhone } from '@/data/countries'
 import { useAuth } from '@/auth/AuthProvider'
 import logo from '../public/logo.svg'
@@ -28,9 +28,10 @@ export default function Connexion() {
   const { refresh } = useAuth()
   const state = location.state as { from?: string; role?: string } | null
   const redirectTo = state?.from ?? '/dashboard'
-  // Role transmis depuis /onboarding ('chef-quartier' | 'agent').
-  // On le mappe vers les valeurs du schema (profiles.role check constraint).
-  const roleFromOnboarding: SignupRole | undefined =
+
+  // Role passed from /onboarding via navigation state.
+  // Maps onboarding labels to profiles.role check constraint values.
+  const roleFromOnboarding: 'chef_quartier' | 'agent_mairie' | undefined =
     state?.role === 'chef-quartier' ? 'chef_quartier'
       : state?.role === 'agent' ? 'agent_mairie'
         : undefined
@@ -63,7 +64,7 @@ export default function Connexion() {
     if (!email.trim() || !email.includes('@')) return setError('Entre une adresse email valide.')
     setLoading(true)
     try {
-      await sendEmailOtp(email.trim().toLowerCase(), roleFromOnboarding)
+      await sendEmailOtp(email.trim().toLowerCase())
       setStep('otp')
       setCountdown(60)
     } catch (e) {
@@ -71,7 +72,7 @@ export default function Connexion() {
     } finally {
       setLoading(false)
     }
-  }, [email, roleFromOnboarding])
+  }, [email])
 
   const handleVerifyEmail = useCallback(async () => {
     if (otp.length < 6) return setError('Entre le code à 6 chiffres.')
@@ -99,12 +100,15 @@ export default function Connexion() {
     if (otp !== PHONE_DEMO_OTP) { setError('Code incorrect.'); setOtp(''); return }
     setError('')
     loginWithPhoneDemo(phone)
-    // Phone-demo writes localStorage only — no Supabase event fires, so we
-    // must nudge the context manually.
+    // Store the role from /onboarding so AuthProvider can read it
+    // (phone-demo users have no profiles row in Supabase).
+    if (roleFromOnboarding) {
+      localStorage.setItem('gandehou-demo-role', roleFromOnboarding)
+    }
     await refresh()
     setStep('success')
     setTimeout(() => navigate(redirectTo, { replace: true }), 1100)
-  }, [phone, otp, navigate, redirectTo, refresh])
+  }, [phone, otp, navigate, redirectTo, refresh, roleFromOnboarding])
 
   useEffect(() => {
     if (otp.length === 6 && step === 'otp') {
@@ -130,7 +134,7 @@ export default function Connexion() {
           <button
             type="button"
             onClick={() => { setStep('input'); setOtp(''); setError('') }}
-            className="flex items-center gap-2 rounded-full md:rounded-2xl bg-gandehou-green/10 p-3 md:px-5 md:py-3 font-medium text-gandehou-green outline-none transition-colors hover:bg-gandehou-green/15 focus-visible:ring-4 focus-visible:ring-gandehou-green/30 dark:bg-gandehou-green/15 dark:hover:bg-gandehou-green/25"
+            className="inline-flex items-center gap-2 text-sm text-neutral-900/60 outline-none transition-colors hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-gandehou-green dark:text-white/60 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             Modifier
@@ -156,8 +160,8 @@ export default function Connexion() {
               {method === 'email' && (
                 <>
                   <Icon icon={Mail} />
-                  <Title>Connexion</Title>
-                  <Lead>Entrez votre adresse email · vous recevrez un lien ou un code.</Lead>
+                  <Title>Connexion Chef de Quartier</Title>
+                  <Lead>Entre ton adresse email · tu recevras un lien ou un code.</Lead>
                   {error && <ErrorBox>{error}</ErrorBox>}
                   <Field label="Adresse email">
                     <div className="relative">
@@ -183,7 +187,7 @@ export default function Connexion() {
                 <>
                   <Icon icon={Phone} />
                   <Title>Connexion par téléphone</Title>
-                  <Lead>Choisisez votre pays et entrez votre numéro · code SMS simulé pour la démo.</Lead>
+                  <Lead>Choisis ton pays et entre ton numéro · code SMS simulé pour la démo.</Lead>
                   {error && <ErrorBox>{error}</ErrorBox>}
                   <div className="mb-6">
                     <PhoneInput
@@ -208,8 +212,8 @@ export default function Connexion() {
               <Lead>Email envoyé à <span className="font-semibold text-neutral-900 dark:text-white">{email}</span></Lead>
               <div className="mb-5 rounded-xl border border-gandehou-yellow/40 bg-gandehou-yellow/15 p-3 text-xs leading-relaxed text-amber-900 dark:text-gandehou-yellow">
                 <strong>2 façons de se connecter :</strong><br />
-                · <strong>Clique le lien "Sign in"</strong> dans l'email · vous etes redirigé connecté.<br />
-                · OU entre les <strong>6 chiffres</strong> ci-dessous.
+                · <strong>Clique le lien "Sign in"</strong> dans l'email · tu es redirigé connecté.<br />
+                · OU entre les <strong>6 chiffres</strong> ci-dessous (si SMTP custom configuré).
               </div>
               {error && <ErrorBox>{error}</ErrorBox>}
               <OTPInput value={otp} onChange={(v) => { setOtp(v); if (error) setError('') }} />
@@ -275,7 +279,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gandehou-green ${active
         ? 'bg-white text-gandehou-green shadow-sm dark:bg-white/10 dark:text-gandehou-green'
         : 'text-neutral-900/50 hover:text-neutral-900 dark:text-white/50 dark:hover:text-white'
-        }`}
+      }`}
     >
       {children}
     </button>

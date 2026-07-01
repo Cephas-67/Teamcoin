@@ -61,7 +61,7 @@ export default function MairieDashboard() {
                 </div>
             </header>
 
-            <main className="mx-auto w-full max-w-xl px-4 pb-20 pt-8">
+            <main className="mx-auto w-full max-w-4xl px-4 pb-20 pt-8">
                 {/* ── Greeting ────────────────────────────────────────────── */}
                 <div className="mb-6">
                     <p className="text-sm font-medium text-gandehou-green">Espace Agent Mairie / Notaire</p>
